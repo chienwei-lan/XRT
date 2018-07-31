@@ -211,6 +211,16 @@ maintainer: soren.soe@xilinx.com
 
 EOF
 
+cat <<EOF > $opt_pkgdir/$dir/DEBIAN/postinst
+
+#!/bin/bash
+echo "Looking for boards whose DSA needs updating..."
+/opt/xilinx/xrt/bin/xbutil flash -a ${opt_dsa}
+exit 0
+
+EOF
+    chmod 755 $opt_pkgdir/$dir/DEBIAN/postinst
+
     mkdir -p $opt_pkgdir/$dir/lib/firmware/xilinx
     rsync -avz $opt_pkgdir/xbinst/$opt_dsa/xbinst/firmware/ $opt_pkgdir/$dir/lib/firmware/xilinx
     mkdir -p $opt_pkgdir/$dir/opt/xilinx/dsa/$opt_dsa/test
@@ -243,6 +253,11 @@ requires: $dsa >= $version
 Xilinx development DSA.
 
 %prep
+
+%post
+echo "Looking for boards whose DSA needs updating..."
+/opt/xilinx/xrt/bin/xbutil flash -a ${opt_dsa}
+exit 0
 
 %install
 mkdir -p %{buildroot}/opt/xilinx/platform/$opt_dsa/hw
