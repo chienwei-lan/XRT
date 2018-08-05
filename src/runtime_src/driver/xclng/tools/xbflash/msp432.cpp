@@ -88,8 +88,7 @@ MSP432_Flasher::~MSP432_Flasher()
 /*
  * xclUpgradeFirmware
  */
-int MSP432_Flasher::xclUpgradeFirmware(const char *tiTxtFileName) {
-    std::ifstream tiTxtStream(tiTxtFileName);
+int MSP432_Flasher::xclUpgradeFirmware(std::istream& tiTxtStream) {
     std::string startAddress;
     ELARecord record;
     bool endRecordFound = false;
@@ -100,13 +99,6 @@ int MSP432_Flasher::xclUpgradeFirmware(const char *tiTxtFileName) {
         return -EOPNOTSUPP;
     }
 
-    if(!tiTxtStream.is_open()) {
-        std::cout << "ERROR: Cannot open " << tiTxtFileName
-                  <<". Check that it exists and is readable." << std::endl;
-        return -ENOENT;
-    }
-
-    std::cout << "INFO: Parsing file " << tiTxtFileName << std::endl;
     while (!tiTxtStream.eof() && !endRecordFound && !errorFound) {
         std::string line;
         std::getline(tiTxtStream, line);
@@ -200,7 +192,7 @@ int MSP432_Flasher::xclUpgradeFirmware(const char *tiTxtFileName) {
     return 0;
 }
 
-int MSP432_Flasher::program(std::ifstream& tiTxtStream, const ELARecord& record)
+int MSP432_Flasher::program(std::istream& tiTxtStream, const ELARecord& record)
 {
     std::string byteStr;
     int ret = 0;
@@ -219,7 +211,7 @@ int MSP432_Flasher::program(std::ifstream& tiTxtStream, const ELARecord& record)
         return 0;
     }
 
-    tiTxtStream.seekg(record.mDataPos, std::ifstream::beg);
+    tiTxtStream.seekg(record.mDataPos, std::ios_base::beg);
     byteStr.clear();
     mPkt.hdr.opCode = XPO_MSP432_SEC_START;
     mPkt.hdr.reserved = 0;
