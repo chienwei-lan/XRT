@@ -40,6 +40,7 @@ opt_cl=0
 opt_dev=0
 
 dsa_version="5.1"
+dsa_timestamp="ffffffffffffffff"
 
 usage()
 {
@@ -164,6 +165,7 @@ doxbinst()
 	echo "################ xbinst failed! ###############"
 	exit $test
     fi
+    dsa_timestamp=`basename \`ls $opt_pkgdir/xbinst/$opt_dsa/xbinst/firmware/*.dsabin\` | cut -d'.' -f 1 | cut -d'-' -f 4`
 }
 
 dodebdev()
@@ -215,7 +217,7 @@ cat <<EOF > $opt_pkgdir/$dir/DEBIAN/postinst
 
 #!/bin/bash
 echo "Looking for boards whose DSA needs updating..."
-/opt/xilinx/xrt/bin/xbutil flash -a ${opt_dsa}
+/opt/xilinx/xrt/bin/xbutil flash -a ${opt_dsa} -t ${dsa_timestamp}
 exit 0
 
 EOF
@@ -256,7 +258,7 @@ Xilinx development DSA.
 
 %post
 echo "Looking for boards whose DSA needs updating..."
-/opt/xilinx/xrt/bin/xbutil flash -a ${opt_dsa}
+/opt/xilinx/xrt/bin/xbutil flash -a ${opt_dsa} -t ${dsa_timestamp}
 exit 0
 
 %install
