@@ -76,6 +76,8 @@
  *      xclbin image
  * 14   Write buffer from device to peer FPGA  DRM_IOCTL_XOCL_COPY_BO         drm_xocl_copy_bo
  *      buffer
+ * 15   SW Mailbox IOCTL                       DRM_IOCTL_XOCL_SW_MAILBOX      drm_xocl_sw_mailbox
+ *
  * ==== ====================================== ============================== ==================================
  */
 
@@ -152,7 +154,8 @@ enum drm_xocl_ops {
 	DRM_XOCL_HOT_RESET,
 	/* Reclock through userpf*/
 	DRM_XOCL_RECLOCK,
-
+	/* Mailbox Tx*/
+	DRM_XOCL_SW_MAILBOX,
 	DRM_XOCL_NUM_IOCTLS
 };
 
@@ -487,6 +490,17 @@ struct drm_xocl_reclock_info {
 };
 
 /*
+ * struct drm_xocl_sw_mailbox *args
+ */
+struct drm_xocl_sw_mailbox {
+	uint64_t flags;
+	uint32_t *pData;
+	bool isTx;
+	size_t sz;
+	uint64_t id;
+};
+
+/*
  * Core ioctls numbers
  */
 
@@ -527,4 +541,6 @@ struct drm_xocl_reclock_info {
 #define DRM_IOCTL_XOCL_HOT_RESET      DRM_IO(DRM_COMMAND_BASE +	DRM_XOCL_HOT_RESET)
 #define DRM_IOCTL_XOCL_RECLOCK     DRM_IOWR(DRM_COMMAND_BASE + \
             DRM_XOCL_RECLOCK, struct drm_xocl_reclock_info)
+#define DRM_IOCTL_XOCL_SW_MAILBOX     DRM_IOWR(DRM_COMMAND_BASE +	\
+					       DRM_XOCL_SW_MAILBOX, struct drm_xocl_sw_mailbox)
 #endif
