@@ -1,5 +1,7 @@
 /*
  * ryan.radjabi@xilinx.com
+ *
+ * References: https://gist.github.com/alexdlaird/3100f8c7c96871c5b94e
  */
 #include <dirent.h>
 #include <iterator>
