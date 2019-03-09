@@ -125,7 +125,7 @@
 #include <linux/device.h>
 #include "../xocl_drv.h"
 
-int mailbox_no_intr = 0;
+int mailbox_no_intr;
 module_param(mailbox_no_intr, int, (S_IRUGO|S_IWUSR));
 MODULE_PARM_DESC(mailbox_no_intr,
 	"Disable mailbox interrupt and do timer-driven msg passing");
@@ -514,7 +514,7 @@ static void clean_sw_buf(struct mailbox_channel *ch)
 {
 	if (!ch->sw_chan_buf)
 		return;
-	
+
 	vfree(ch->sw_chan_buf);
 	ch->sw_chan_buf = NULL;
 
@@ -866,7 +866,7 @@ static void do_sw_rx(struct mailbox_channel *ch)
 {
 	int err = 0;
 	struct mailbox_msg *msg = NULL;
-	
+
 	mutex_lock(&ch->sw_chan_mutex);
 	if (!ch->sw_chan_buf)
 		goto done;
@@ -912,7 +912,7 @@ static void do_hw_rx(struct mailbox_channel *ch)
 	} else {
 		read_hw = ((st & STATUS_RTA) != 0);
 	}
-	if(!read_hw)
+	if (!read_hw)
 		return;
 
 	chan_recv_pkt(ch);
@@ -1088,7 +1088,7 @@ static void handle_tx_timer_event(struct mailbox_channel *ch)
 }
 
 static void do_sw_tx(struct mailbox_channel *ch)
-{	
+{
 	struct mailbox *mbx = ch->mbc_parent;
 	mutex_lock(&ch->sw_chan_mutex);
 
@@ -1104,7 +1104,7 @@ static void do_sw_tx(struct mailbox_channel *ch)
 			ch->mbc_cur_msg->mbm_timer_on = true;
 	}
 
-	if (ch->mbc_cur_msg){
+	if (ch->mbc_cur_msg) {
 		if(ch->sw_chan_buf) {
 			complete(&ch->sw_chan_complete);
 			goto done;
@@ -1112,7 +1112,7 @@ static void do_sw_tx(struct mailbox_channel *ch)
 		if (!ch->mbc_cur_msg->mbm_chan_sw)
 			goto done;
 		ch->sw_chan_buf = vmalloc(ch->mbc_cur_msg->mbm_len);
-		if(!ch->sw_chan_buf)
+		if (!ch->sw_chan_buf)
 			goto done;
 		ch->sw_chan_buf_sz = ch->mbc_cur_msg->mbm_len;
 		ch->sw_chan_msg_id = ch->mbc_cur_msg->mbm_req_id;
@@ -1149,7 +1149,7 @@ static void do_hw_tx(struct mailbox_channel *ch)
 			ch->mbc_cur_msg->mbm_timer_on = true;
 	}
 
-	if (ch->mbc_cur_msg){
+	if (ch->mbc_cur_msg) {
 		if (ch->mbc_cur_msg->mbm_chan_sw)
 			return;
 
@@ -1875,11 +1875,13 @@ static int mailbox_probe(struct platform_device *pdev)
 	mailbox_reg_wr(mbx, &mbx->mbx_regs->mbr_ctrl, 0x1);
 
 	/* Set up software communication channels. */
-	if ((ret = chan_init(mbx, "RX", &mbx->mbx_rx, chan_do_rx)) != 0) {
+	ret = chan_init(mbx, "RX", &mbx->mbx_rx, chan_do_rx);
+	if (ret != 0) {
 		MBX_ERR(mbx, "failed to init rx channel");
 		goto failed;
 	}
-	if ((ret = chan_init(mbx, "TX", &mbx->mbx_tx, chan_do_tx)) != 0) {
+	ret = chan_init(mbx, "TX", &mbx->mbx_tx, chan_do_tx);
+	if (ret != 0) {
 		MBX_ERR(mbx, "failed to init tx channel");
 		goto failed;
 	}
@@ -1893,7 +1895,8 @@ static int mailbox_probe(struct platform_device *pdev)
 	INIT_WORK(&mbx->mbx_listen_worker, mailbox_recv_request);
 	queue_work(mbx->mbx_listen_wq, &mbx->mbx_listen_worker);
 
-	if ((ret = sysfs_create_group(&pdev->dev.kobj, &mailbox_attrgroup) != 0)) {
+	ret = sysfs_create_group(&pdev->dev.kobj, &mailbox_attrgroup);
+	if (ret != 0) {
 		MBX_ERR(mbx, "failed to init sysfs");
 		goto failed;
 	}
