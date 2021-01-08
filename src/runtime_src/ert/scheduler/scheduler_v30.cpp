@@ -1194,7 +1194,7 @@ scheduler_v30_loop()
   while (1) {
     for (size_type slot_idx=0; slot_idx<num_slots; ++slot_idx) {
       auto& slot = command_slots[slot_idx];
-      CTRL_DEBUGF(" Hello \r\n");
+      //CTRL_DEBUGF(" Hello \r\n");
 #ifdef ERT_HW_EMU
       reg_access_wait();
 #endif
