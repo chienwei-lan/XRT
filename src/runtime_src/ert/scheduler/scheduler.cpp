@@ -252,6 +252,7 @@ static bitset_type cu_interrupt_mask;
 /**
  * Utility to read a 32 bit value from any axi-lite peripheral
  */
+
 inline value_type
 read_reg(addr_type addr)
 {

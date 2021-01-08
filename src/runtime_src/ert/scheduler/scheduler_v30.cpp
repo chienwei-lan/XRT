@@ -22,6 +22,7 @@
 // includes from bsp
 #ifndef ERT_HW_EMU
 #include <xil_printf.h>
+
 #include <mb_interface.h>
 #include <xparameters.h>
 #else
@@ -33,6 +34,7 @@
 #include <stdlib.h>
 #include <limits>
 #include <bitset>
+#include <cstring>
 
 // version is a git hash passed in from build script
 // default for builds that bypass build script
@@ -84,6 +86,7 @@ ert_assert(const char* file, long line, const char* function, const char* expr, 
 #else
 # define CTRL_DEBUG(msg)
 # define CTRL_DEBUGF(format,...)
+# define DMSGF(format,...)
 #endif
 
 #ifdef ERT_HW_EMU
@@ -139,6 +142,15 @@ addr_type CU_STATUS_REGISTER_ADDR[4] = {0, 0, 0, 0};
 
 addr_type CQ_STATUS_REGISTER_ADDR[4] = {0, 0, 0, 0};
 
+addr_type CU_IPR[4] = {0, 0, 0, 0};
+
+value_type CQ_STATUS[4] = {0, 0, 0, 0};
+
+value_type COMPLETE_SLOT[4] = {0, 0, 0, 0};
+
+value_type CU_ARGS[8][32] = {0};
+value_type ARGS[32] = {0};
+
 /**
  * Simple bitset type supporting 128 bits
  *
@@ -186,7 +198,7 @@ static addr_type cu_base_address            = 0x0;
 // CU address map
 static addr_type cu_addr_map[max_cus]       = {0};
 
-// CU offset (addone is 64k (1<<16), OCL is 4k (1<<12))
+// CU offset (addone is 64k (1<<16), OCL is 4k (1<<12)) 
 static size_type cu_offset                  = 16;
 
 // Slot size
@@ -244,15 +256,24 @@ static size_type cu_slot_usage[max_cus];
 // Fixed sized map from cu_idx -> number of times executed
 static size_type cu_usage[max_cus];
 
+static value_type cq_new[max_slots];
+
+
+static size_type start_t = 0;
+static size_type end_t = 0;
 // Bitmask indicating status of CUs. (0) idle, (1) running.
 // Only 'num_cus' lower bits are used
 static bitset_type cu_status;
 
 static bitset_type slot_submitted;
 
+//static bitset_type cq_new;
+
 static bitset_type cu_ready;
 
 static bitset_type cu_done;
+
+static bitset_type cu_args_cached;
 // Bitmask for interrupt enabled CUs.  (0) no interrupt (1) enabled
 static bitset_type cu_interrupt_mask;
 #ifndef ERT_HW_EMU
@@ -427,6 +448,10 @@ setup_ert_base_addr()
   CQ_STATUS_REGISTER_ADDR[1] = ERT_CQ_STATUS_REGISTER_ADDR1;
   CQ_STATUS_REGISTER_ADDR[2] = ERT_CQ_STATUS_REGISTER_ADDR2;
   CQ_STATUS_REGISTER_ADDR[3] = ERT_CQ_STATUS_REGISTER_ADDR3;
+  CU_IPR[0] = ERT_INTC_CU_0_31_IPR;
+  CU_IPR[1] = ERT_INTC_CU_32_63_IPR;
+  CU_IPR[2] = ERT_INTC_CU_64_95_IPR;
+  CU_IPR[3] = ERT_INTC_CU_96_127_IPR;
 }
 
 /**
@@ -457,7 +482,8 @@ setup()
   CTRL_DEBUGF("dmsg=%d\r\n",dmsg);
   CTRL_DEBUGF("echo=%d\r\n",echo);
   CTRL_DEBUGF("polling=%d\r\n",polling);
-
+  CTRL_DEBUGF("end_t=%d\r\n",end_t);
+  CTRL_DEBUGF("start_t=%d\r\n",start_t);
   // Initialize command slots
   for (size_type i=0; i<num_slots; ++i) {
     auto& slot = command_slots[i];
@@ -469,16 +495,36 @@ setup()
 
     // Clear command queue headers memory
     write_reg(slot.slot_addr,0x0);
+
+    cq_new[i] = 0;
   }
 
   // Clear CSR  (COR so read)
-  for (size_type i=0; i<4; ++i)
+  for (size_type i=0; i<4; ++i) {
     ERT_UNUSED volatile auto val = read_reg(STATUS_REGISTER_ADDR[i]);
-
+    CQ_STATUS[i] = 0;
+    COMPLETE_SLOT[i] = 0;
+  }
+#if 0
+  ARGS[4] = 0;
+  ARGS[5] = 0;
+  ARGS[6] = 0;
+  ARGS[7] = 1000;
+  ARGS[8] = 0;
+  ARGS[9] = 0;
+  ARGS[10] = 400;
+  ARGS[11] = 0;
+  ARGS[12] = 400;
+  ARGS[13] = 0;
+  ARGS[14] = 400;
+  ARGS[15] = 0;
+#endif
   cu_status.reset();
   cu_ready.reset();
   cu_done.reset();
   slot_submitted.reset();
+  cu_args_cached.reset();
+  
 
   // Initialize cu_slot_usage
   for (size_type i=0; i<num_cus; ++i) {
@@ -530,6 +576,7 @@ setup()
       write_reg(cu_idx_to_addr(cu) + 0x8, 1);
       cu_interrupt_mask[cu] = 1;
     }
+
     intc_ier_mask |= 0x1E0; // acccept cu interrupts on bit 1 of the ier of intc
     enable_master_interrupts = true;
 
@@ -623,10 +670,10 @@ notify_host(size_type cmd_idx)
 inline void
 configure_cu(addr_type cu_addr, addr_type regmap_addr, size_type regmap_size)
 {
-  // write register map, starting at base + 0x10
-  // 0x4, 0x8, 0xc used for interrupt, which is initialized in setup
-  for (size_type idx = 4; idx < regmap_size; ++idx)
-    write_reg(cu_addr + (idx << 2), read_reg(regmap_addr + (idx << 2)));
+  uint32_t *addr_ptr = (uint32_t *)(uintptr_t)cu_addr;
+  uint32_t *regmap_ptr = (uint32_t *)(uintptr_t)regmap_addr;
+
+  memcpy(addr_ptr+4, regmap_ptr+4, regmap_size);
 
   // start kernel at base + 0x0
   write_reg(cu_addr, 0x1);
@@ -803,7 +850,9 @@ configure_mb(size_type slot_idx)
 
   slot.header_value = (slot.header_value & ~0xF) | 0x4; // free
   CTRL_DEBUGF("slot(%d) [running -> free]\r\n",slot_idx);
-
+  CTRL_DEBUGF("before CQ_STATUS[0] %d\r\n", CQ_STATUS[slot_idx>>5]);
+  CQ_STATUS[slot_idx>>5] &= ~(1<<(slot_idx&0xFFFFFFFF));
+  CTRL_DEBUGF("after CQ_STATUS[0] %d\r\n", CQ_STATUS[slot_idx>>5]);
   CTRL_DEBUGF("<--configure_mb\r\n");
   return true;
 }
@@ -918,6 +967,34 @@ abort_mb(size_type slot_idx)
   return true;
 }
 
+static bool
+counter_calib(size_type slot_idx)
+{
+  //CTRL_DEBUGF("counter_calib cmd found in slot(%d)\r\n",slot_idx);
+
+  auto& slot = command_slots[slot_idx];
+  volatile size_type start, end;
+  size_type cnt = 100000000;
+  volatile size_type dummy=0;
+  slot.opcode = opcode(slot.header_value);
+
+  start = read_reg(0x1F70000);
+
+  while(cnt--){
+    dummy++;
+  }
+
+  end = read_reg(0x1F70000);
+
+  //CTRL_DEBUGF(" total %d %d dummy %d\r\n",end-start, slot.opcode, dummy);
+
+  write_reg(slot.slot_addr+0x100, end-start);
+
+  notify_host(slot_idx);
+  slot.header_value = (slot.header_value & ~0xF) | 0x4;
+  return true;
+}
+
 /**
  * Process special command.
  *
@@ -937,6 +1014,8 @@ process_special_command(value_type opcode, size_type slot_idx)
     return exit_mb(slot_idx);
   if (opcode==ERT_ABORT)
     return abort_mb(slot_idx);
+  if (opcode==ERT_CNT_CALIB)
+    return counter_calib(slot_idx);
   return false;
 }
 
@@ -1061,6 +1140,31 @@ running_to_free(size_type slot_idx)
   return true;
 }
 
+inline void cu_hls_ctrl_check(size_type cmd_idx)
+{
+    auto cuvalue = read_reg(cu_idx_to_addr(cmd_idx));
+    DMSGF("cu(%d) is interrupting\r\n",cmd_idx);
+    ERT_ASSERT(cu_status[cmd_idx],"cu wasn't started");
+    // check if command is done
+    check_command(cu_slot_usage[cmd_idx],cmd_idx);
+    cu_slot_usage[cmd_idx] = no_index; // reset slot index
+    cu_status[cmd_idx] = !cu_status[cmd_idx]; // toggle status of completed cus
+    slot_submitted[cmd_idx] = !slot_submitted[cmd_idx];
+     
+    //CQ_STATUS[cq_sta_idx] &= ~(1<<idx);
+
+    if (cuvalue & (AP_DONE)) {
+      DMSGF("AP_DONE \r\n");
+      cu_done[cmd_idx] = 1;
+      write_reg(cu_idx_to_addr(cmd_idx), AP_CONTINUE);
+      write_reg(cu_idx_to_addr(cmd_idx)+0xC, 0x1);
+    }
+
+    if (cuvalue & (AP_READY)) {
+      DMSGF("AP_READY \r\n");
+      cu_ready[cmd_idx] = 1;
+    }
+}
 /**
  * Main routine executed by embedded scheduler loop
  *
@@ -1090,11 +1194,90 @@ scheduler_v30_loop()
   while (1) {
     for (size_type slot_idx=0; slot_idx<num_slots; ++slot_idx) {
       auto& slot = command_slots[slot_idx];
-
+      CTRL_DEBUGF(" Hello \r\n");
 #ifdef ERT_HW_EMU
       reg_access_wait();
 #endif
+      if (polling && slot_idx>0 && kds_30) {
+#if 1
+        auto i = slot_idx>>5;
+        value_type complete = COMPLETE_SLOT[i];
+        if (complete) {
+          write_reg(STATUS_REGISTER_ADDR[i],complete);
+          COMPLETE_SLOT[i] = 0;
+        }
+#endif
+        if (!cq_new[slot_idx]) {
+          value_type slot_addr = slot.slot_addr;
+          auto val = read_reg(slot_addr);
+          if (val & AP_START) {
+            write_reg(slot.slot_addr,0x0); // clear
+            if (echo) {
+              // clear command queue
+              notify_host(slot_idx);
+              continue;
+            }
 
+            cq_new[slot_idx] = val;
+            addr_type addr = cu_section_addr(slot_addr);
+            slot.cu_idx = read_reg(addr);
+            slot.header_value = cq_new[slot_idx];
+            slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
+            slot.regmap_size = regmap_size(slot.header_value);
+          }
+        }
+        // we have nothing else to do
+        if (!cq_new[slot_idx])
+          continue;
+
+        // there must be some value in cq_new
+        // cached cu arguments
+
+        value_type cu_idx = slot.cu_idx;
+        // check CU if done
+
+        auto cuvalue = read_reg(cu_idx_to_addr(cu_idx));
+        if (cu_status[cu_idx]) {
+          //CTRL_DEBUGF(" cuvalue %x\r\n",cuvalue);
+          if (cuvalue & (AP_DONE)) { // 153 cycles 
+            auto cu_slot = cu_slot_usage[cu_idx];
+
+            write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+            //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+            #if 0
+            notify_host(cu_slot);
+            #else
+            COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
+            #endif
+            cu_status[cu_idx] = !cu_status[cu_idx];
+            //CTRL_DEBUGF("cu_status[%d] = (%d)\r\n",cu_idx, (uint32_t)cu_status[cu_idx]);
+            cq_new[cu_slot] = 0;
+            //CTRL_DEBUGF("cq_new[%d] = (%d)\r\n",cu_slot_usage[cu_idx],cq_new[cu_slot]);
+          }
+        }
+
+        if (!cu_status[cu_idx]) {
+          if (cq_new[slot_idx] & (AP_START)) {
+            write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+            //write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1);
+
+            if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
+              configure_cu_ooo(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
+            else
+              configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+            //}
+            cu_status[cu_idx] = !cu_status[cu_idx];
+            //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
+            //cq_new[slot_idx] = 0;
+            set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
+            //CTRL_DEBUGF(" cu %d got by slot %d\r\n",slot.cu_idx, slot_idx);
+            // CTRL_DEBUGF("cu_slot_usage[%d] = (%d)\r\n",slot.cu_idx,cu_slot_usage[slot.cu_idx]);
+          }
+        }
+        
+        continue;
+      }
+#if 1
       // In dataflow mode ERT is polling CUs for completion after
       // host has started CU or acknowleged completion.  Ctrl cmds
       // are processed in normal flow.
@@ -1106,7 +1289,10 @@ scheduler_v30_loop()
           auto cqvalue = read_reg(slot.slot_addr);
 
           if (cqvalue & (AP_START|AP_CONTINUE)) {
+            //start_t = read_reg(0x1F70000);
             write_reg(slot.slot_addr,0x0); // clear
+            notify_host(slot_idx);
+            continue;       
             DMSGF("slot.slot_addr 0x%x enable cu(%d) cqvalue(0x%x)\r\n", slot.slot_addr,cuidx,cqvalue);
             cu_status[cuidx] = !cu_status[cuidx]; // enable polling of this CU
           }
@@ -1121,64 +1307,13 @@ scheduler_v30_loop()
           continue;
 
         cu_status[cuidx] = !cu_status[cuidx]; // disable polling until host re-enables
-
         // wake up host
         notify_host(slot_idx);
+        //end_t = read_reg(0x1F70000);
+        //CTRL_DEBUGF("total_cycle=0x%x\r\n",end_t-start_t);
         continue;
       }
-
-      if (polling && slot_idx>0 && kds_30) {
-
-        addr_type addr = cu_section_addr(slot.slot_addr);
-        slot.cu_idx = read_reg(addr);
-        if (!cu_status[slot.cu_idx]) {
-          auto cqvalue = read_reg(slot.slot_addr);
-
-          if (cqvalue & (AP_START)) {
-             write_reg(slot.slot_addr,0x0); // clear
-            if (echo) {
-              // clear command queue
-              notify_host(slot_idx);
-              continue;              
-            }
-
-            slot_submitted[slot_idx] = !slot_submitted[slot_idx];
-            // kick start kernel
-            slot.header_value = cqvalue;
-            slot.regmap_addr = regmap_section_addr(slot.header_value,slot.slot_addr);
-            slot.regmap_size = regmap_size(slot.header_value);
-
-            if (slot.opcode==ERT_EXEC_WRITE)
-              // Out of order configuration
-              configure_cu_ooo(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
-            else
-              configure_cu(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
-
-            cu_status[slot.cu_idx] = !cu_status[slot.cu_idx]; // enable polling of this CU
-            set_cu_info(slot.cu_idx,slot_idx); // record which slot cu associated with
-
-          }
-        }
-
-        if (!cu_status[slot.cu_idx] || !slot_submitted[slot_idx])
-          continue; // CU is not used
-
-        auto cuvalue = read_reg(cu_idx_to_addr(slot.cu_idx));
-        if (!(cuvalue & (AP_DONE)))
-          continue;
-
-        slot_submitted[slot_idx] = !slot_submitted[slot_idx];
-        cu_status[slot.cu_idx] = !cu_status[slot.cu_idx]; // disable polling until host re-enables
-
-        // wake up host
-        notify_host(slot_idx);
-
-        write_reg(cu_idx_to_addr(slot.cu_idx), AP_CONTINUE);
-        write_reg(cu_idx_to_addr(slot.cu_idx)+0xC, 0x1);
-
-        continue;
-      }
-
+#endif
       if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
         if (!free_to_new(slot_idx))
           continue;
@@ -1199,10 +1334,12 @@ scheduler_v30_loop()
           continue;
       }
     }
+    //end_t = read_reg(0x1F70000);
+    //CTRL_DEBUGF("total_cycle=0x%x\r\n",end_t-start_t);    
   } // while
 }
 
-
+/*
 static inline void cu_hls_ctrl_check(size_type cmd_idx)
 {
     auto cuvalue = read_reg(cu_idx_to_addr(cmd_idx));
@@ -1225,6 +1362,7 @@ static inline void cu_hls_ctrl_check(size_type cmd_idx)
       cu_ready[cmd_idx] = 1;
     }
 }
+*/
 /**
  * CU interrupt service routine
  */

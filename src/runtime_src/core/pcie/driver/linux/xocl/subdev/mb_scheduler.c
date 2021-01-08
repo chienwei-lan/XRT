@@ -1531,12 +1531,16 @@ ert_start_cmd(struct xocl_ert *xert, struct xocl_cmd *xcmd)
 		xocl_memcpy_toio(xert->cq_base + slot_addr + 8,
 				 ecmd->data + 1, (ecmd->count - 1) * sizeof(u32));
 	}
-	else
+	else {
 		xocl_memcpy_toio(xert->cq_base + slot_addr + 4,
 				 ecmd->data, ecmd->count * sizeof(u32));
 
+		iowrite32(ecmd->header, xert->cq_base + slot_addr);
+
+	}
+
 	// write header
-	iowrite32(ecmd->header, xert->cq_base + slot_addr);
+	//iowrite32(ecmd->header, xert->cq_base + slot_addr);
 
 	/*
 	 * Always try to trigger interrupt to embedded scheduler.

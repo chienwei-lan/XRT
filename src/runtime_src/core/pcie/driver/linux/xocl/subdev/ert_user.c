@@ -148,7 +148,6 @@ static ssize_t ert_echo_store(struct device *dev,
 			"usage: echo 0 or 1 > ert_echo");
 		return -EINVAL;
 	}
-
 	ert_user->echo = val;
 
 	mutex_unlock(&ert_user->lock);
@@ -542,12 +541,13 @@ static int ert_cfg_cmd(struct xocl_ert_user *ert_user, struct ert_user_command *
 	// xclbin while ERT asynchronous configure is running.
 	//exec->configure_active = true;
 
-	ERTUSER_INFO(ert_user, "scheduler config ert(%d), dataflow(%d), slots(%d), cudma(%d), cuisr(%d)\n"
+	ERTUSER_INFO(ert_user, "scheduler config ert(%d), dataflow(%d), slots(%d), cudma(%d), cuisr(%d) cfg->kds_30(%d)\n"
 		 , ert_poll | ert_full
 		 , cfg->dataflow
 		 , ert_user->num_slots
 		 , cfg->cu_dma ? 1 : 0
-		 , cfg->cu_isr ? 1 : 0);
+		 , cfg->cu_isr ? 1 : 0
+		 , cfg->kds_30);
 
 	// TODO: reset all queues
 	ert_user_reset(ert_user);

@@ -1837,8 +1837,8 @@ int xcldev::xclReset(int argc, char *argv[])
     }
 
     std::cout << "All existing processes will be killed." << std::endl;
-    if (!canProceed())
-        return -ECANCELED;
+    //if (!canProceed())
+        //return -ECANCELED;
 
     std::unique_ptr<device> d = xclGetDevice(index);
     if (!d)

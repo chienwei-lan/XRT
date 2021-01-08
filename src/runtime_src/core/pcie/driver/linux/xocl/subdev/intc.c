@@ -347,7 +347,7 @@ static int csr_read32(struct platform_device *pdev, u32 off)
 {
 	struct xocl_intc *intc = platform_get_drvdata(pdev);
 
-	WARN_ON(intc->ert[off>>2].enabled_cnt > 0);
+	//WARN_ON(intc->ert[off>>2].enabled_cnt > 0);
 
 	return ioread32(intc->csr_base + off);
 }
@@ -356,7 +356,7 @@ static void csr_write32(struct platform_device *pdev, u32 val, u32 off)
 {
 	struct xocl_intc *intc = platform_get_drvdata(pdev);
 
-	WARN_ON(intc->ert[off>>2].enabled_cnt > 0);
+	//WARN_ON(intc->ert[off>>2].enabled_cnt > 0);
 
 	iowrite32(val, intc->csr_base + off);
 }
@@ -446,7 +446,8 @@ get_legacy_res(struct platform_device *pdev, struct xocl_intc *intc)
 		data->xdev = xdev;
 		INIT_WORK(&data->work, intc_polling);
 		data->type = ERT_CSR_TYPE;
-		data->blanking = 1;
+
+		data->blanking = 0;
 	}
 
 	return 0;
@@ -542,7 +543,7 @@ get_ssv3_res(struct platform_device *pdev, struct xocl_intc *intc)
 		/* disable interrupt */
 		xocl_user_interrupt_config(xdev, data->intr, false);
 
-		data->blanking = 1;
+		data->blanking = 0;
 	}
 
 	return 0;

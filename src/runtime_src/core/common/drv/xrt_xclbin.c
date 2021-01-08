@@ -223,15 +223,17 @@ xrt_xclbin_section_info(const struct axlf *xclbin, enum axlf_section_kind kind,
 	uint64_t xclbin_len;
 	int err = 0;
 
+	printk(KERN_ERR "AAA");
 	memHeader = xrt_xclbin_get_section_hdr(xclbin, kind);
 	if (!memHeader)
 		return -EINVAL;
 
+	printk(KERN_ERR "BBB");
 	xclbin_len = xclbin->m_header.m_length;
 	err = xrt_xclbin_check_section_hdr(memHeader, xclbin_len);
 	if (err)
 		return err;
-
+	printk(KERN_ERR "CCC");
 	*offset = memHeader->m_sectionOffset;
 	*size = memHeader->m_sectionSize;
 

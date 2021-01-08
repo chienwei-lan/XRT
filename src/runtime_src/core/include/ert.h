@@ -347,6 +347,23 @@ struct ert_abort_cmd {
 };
 
 /**
+ * struct ert_abort_cmd: ERT abort command format.
+ *
+ * @idx: The slot index of command to abort
+ */
+struct ert_cnt_calib_cmd {
+  union {
+    struct {
+      uint32_t state:4;          /* [3-0]   */
+      uint32_t unused:11;        /* [14-4]  */
+      uint32_t idx:8;            /* [22-15] */
+      uint32_t opcode:5;         /* [27-23] */
+      uint32_t type:4;           /* [31-27] */
+    };
+    uint32_t header;
+  };
+};
+/**
  * ERT command state
  *
  * @ERT_CMD_STATE_NEW:         Set by host before submitting a command to
@@ -408,6 +425,7 @@ enum ert_cmd_opcode {
   ERT_SK_UNCONFIG   = 10,
   ERT_INIT_CU       = 11,
   ERT_START_FA      = 12,
+  ERT_CNT_CALIB     = 13,
 };
 
 /**
