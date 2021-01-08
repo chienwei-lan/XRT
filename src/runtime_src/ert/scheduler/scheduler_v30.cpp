@@ -1199,7 +1199,7 @@ scheduler_v30_loop()
       reg_access_wait();
 #endif
       if (polling && slot_idx>0 && kds_30) {
-#if 1
+#if 0
         auto i = slot_idx>>5;
         value_type complete = COMPLETE_SLOT[i];
         if (complete) {
@@ -1244,7 +1244,7 @@ scheduler_v30_loop()
 
             write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
             //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
-            #if 0
+            #if 1
             notify_host(cu_slot);
             #else
             COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
