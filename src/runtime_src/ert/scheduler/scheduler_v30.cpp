@@ -1263,8 +1263,14 @@ scheduler_v30_loop()
 
             if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
               configure_cu_ooo(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
-            else
+            else {
+              value_type start_t, end_t;
+
+              start_t = read_reg(0x1F70000);
               configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+              end_t = read_reg(0x1F70000);
+              CTRL_DEBUGF("time (%d)\r\n" (uint32_t)end_t-start_t);
+            }
             //}
             cu_status[cu_idx] = !cu_status[cu_idx];
             //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
