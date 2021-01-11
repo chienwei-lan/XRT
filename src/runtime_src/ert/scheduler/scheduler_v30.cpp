@@ -148,8 +148,8 @@ value_type CQ_STATUS[4] = {0, 0, 0, 0};
 
 value_type COMPLETE_SLOT[4] = {0, 0, 0, 0};
 
-value_type CU_ARGS[8][32] = {0};
-value_type ARGS[32] = {0};
+value_type CU_PEND_SLOT[128][4] = {0};
+
 
 /**
  * Simple bitset type supporting 128 bits
@@ -1192,7 +1192,7 @@ scheduler_v30_loop()
   setup();
 
   while (1) {
-
+#if 0
     if (kds_30) {
       CTRL_DEBUGF("kds_30 new flow \r\n");
       for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
@@ -1200,15 +1200,46 @@ scheduler_v30_loop()
         CTRL_DEBUGF("command queue status: 0x%x\r\n",slot_mask);
         // Transition each new command into new state
         for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
+          CTRL_DEBUGF("found slot: %d\r\n",slot_idx);
+          auto& slot = command_slots[slot_idx];
 
+          if (slot_idx > 0) {
+            value_type slot_addr = slot.slot_addr;
+            auto val = read_reg(slot_addr);
+            if (val & AP_START) {
+              write_reg(slot.slot_addr,0x0); // clear
+              if (echo) {
+                // clear command queue
+                notify_host(slot_idx);
+                continue;
+              }
+              //q_new[slot_idx] = val;
+              addr_type addr = cu_section_addr(slot_addr);
+              slot.cu_idx = read_reg(addr);
+              CU_PEND_SLOT[slot.cu_idx][w] |= (1 << (offset>>5));
+              //slot.header_value = cq_new[slot_idx];
+              //slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
+              //slot.regmap_size = regmap_size(slot.header_value);
+            }
+          }
+
+          if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
+            if (!free_to_new(slot_idx))
+              continue;
+          }
+
+          if ((slot.header_value & 0xF) == 0x1) { // new
+            if (!new_to_queued(slot_idx))
+              continue;
+          }
         }
 
       }
-    }
 
+    }
+#endif
     for (size_type slot_idx=0; slot_idx<num_slots; ++slot_idx) {
       auto& slot = command_slots[slot_idx];
-      //CTRL_DEBUGF(" Hello \r\n");
 #ifdef ERT_HW_EMU
       reg_access_wait();
 #endif

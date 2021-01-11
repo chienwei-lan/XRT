@@ -139,6 +139,8 @@ addr_type CU_STATUS_REGISTER_ADDR[4] = {0, 0, 0, 0};
 
 addr_type CQ_STATUS_REGISTER_ADDR[4] = {0, 0, 0, 0};
 
+value_type CU_PENDING_SLOT[128][4] = {0};
+
 /**
  * Simple bitset type supporting 128 bits
  *
@@ -518,7 +520,7 @@ setup()
   write_reg(ERT_CU_DMA_ENABLE_ADDR,cu_dma_enabled);
 
   // Fill CU base addresses for cuisr
-  if(cu_dma_52) {
+  if(cu_dma_52 && !kds_30) {
     for (size_type i=0; i<num_cus; ++i) {
       write_reg(ERT_CUISR_LUT_ADDR+i*4, cu_idx_to_addr(i)/4);
     }
@@ -1218,7 +1220,7 @@ scheduler_loop()
               // Out of order configuration
               configure_cu_ooo(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
             else
-              configure_cu(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
+              configure_cu_dma(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
 
             cu_status[slot.cu_idx] = !cu_status[slot.cu_idx]; // enable polling of this CU
             set_cu_info(slot.cu_idx,slot_idx); // record which slot cu associated with
