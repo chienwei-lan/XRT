@@ -1192,6 +1192,20 @@ scheduler_v30_loop()
   setup();
 
   while (1) {
+
+    if (kds_30) {
+      CTRL_DEBUGF("kds_30 new flow \r\n");
+      for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
+        auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[w]);
+        CTRL_DEBUGF("command queue status: 0x%x\r\n",slot_mask);
+        // Transition each new command into new state
+        for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
+
+        }
+
+      }
+    }
+
     for (size_type slot_idx=0; slot_idx<num_slots; ++slot_idx) {
       auto& slot = command_slots[slot_idx];
       //CTRL_DEBUGF(" Hello \r\n");
