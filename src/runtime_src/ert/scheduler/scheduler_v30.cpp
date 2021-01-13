@@ -258,6 +258,8 @@ static size_type cu_usage[max_cus];
 
 static value_type cq_new[max_slots];
 
+static value_type level1_idx[max_slots];
+
 
 static size_type start_t = 0;
 static size_type end_t = 0;
@@ -495,6 +497,8 @@ setup()
 
     // Clear command queue headers memory
     write_reg(slot.slot_addr,0x0);
+
+    memset(CU_PEND_SLOT[i], 0, 16);
 
     cq_new[i] = 0;
   }
@@ -1192,13 +1196,15 @@ scheduler_v30_loop()
   setup();
 
   while (1) {
-#if 0
-    if (kds_30) {
+#if 1
+    //if (kds_30) {
       CTRL_DEBUGF("kds_30 new flow \r\n");
+      // sync CQ
       for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
         auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[w]);
         CTRL_DEBUGF("command queue status: 0x%x\r\n",slot_mask);
         // Transition each new command into new state
+
         for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
           CTRL_DEBUGF("found slot: %d\r\n",slot_idx);
           auto& slot = command_slots[slot_idx];
@@ -1216,11 +1222,15 @@ scheduler_v30_loop()
               //q_new[slot_idx] = val;
               addr_type addr = cu_section_addr(slot_addr);
               slot.cu_idx = read_reg(addr);
-              CU_PEND_SLOT[slot.cu_idx][w] |= (1 << (offset>>5));
+
+              CU_PEND_SLOT[slot.cu_idx][w] |= (1 << (slot_idx%32));
+              CTRL_DEBUGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
+              level1_idx[slot.cu_idx] |= 1<<w;
               //slot.header_value = cq_new[slot_idx];
               //slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
               //slot.regmap_size = regmap_size(slot.header_value);
             }
+            continue;
           }
 
           if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
@@ -1234,15 +1244,91 @@ scheduler_v30_loop()
           }
         }
 
+        // check CU done
+
+        for (size_type i=0; i<num_slot_masks; ++i) {
+          value_type cu_mask = read_reg(CU_IPR[i]), cu_offset = i<<5;
+          CTRL_DEBUGF("cu_mask[%d] = %x \r\n", i, cu_mask);
+          for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
+            if (cu_mask & 0x1) {
+              auto cu_slot = cu_slot_usage[cu_idx];
+
+              CTRL_DEBUGF("cu[%d] done \r\n", i);
+
+              write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+              //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+              #if 1
+              notify_host(cu_slot);
+              #else
+              COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
+              #endif
+              cu_status[cu_idx] = !cu_status[cu_idx];              
+            }
+          }
+        }
+        // start CU
+        for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
+          value_type level1_mask = level1_idx[cu_idx];
+
+          if (!level1_mask)
+            continue;
+
+          if (cu_status[cu_idx])
+            break;
+
+          for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
+            value_type pending_slot = CU_PEND_SLOT[cu_idx][w];
+            CTRL_DEBUGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
+            if (cu_status[cu_idx])
+              break;
+
+            if (!pending_slot) {
+              level1_mask &= ~(1<<w);
+              continue;
+            }
+
+            for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
+              auto& slot = command_slots[slot_idx];
+              
+              if (cu_status[cu_idx])
+                break;
+
+              if (!(pending_slot & 0x1))
+                continue;
+
+               CTRL_DEBUGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
+              if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
+                configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+              else {
+                //value_type start_t, end_t;
+
+                //start_t = read_reg(0x1F70000);
+                configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+                //end_t = read_reg(0x1F70000);
+                //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
+              }
+              //}
+              cu_status[cu_idx] = !cu_status[cu_idx];
+              //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
+              //cq_new[slot_idx] = 0;
+              set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
+              break;
+            }
+          }
+        }
+        continue;
       }
 
-    }
+    //}
 #endif
+#if 0
     for (size_type slot_idx=0; slot_idx<num_slots; ++slot_idx) {
       auto& slot = command_slots[slot_idx];
 #ifdef ERT_HW_EMU
       reg_access_wait();
 #endif
+      if (kds_30)
+        break;
       if (polling && slot_idx>0 && kds_30) {
 #if 0
         auto i = slot_idx>>5;
@@ -1328,7 +1414,8 @@ scheduler_v30_loop()
         
         continue;
       }
-#if 1
+#endif
+#if 0
       // In dataflow mode ERT is polling CUs for completion after
       // host has started CU or acknowleged completion.  Ctrl cmds
       // are processed in normal flow.
@@ -1364,7 +1451,7 @@ scheduler_v30_loop()
         //CTRL_DEBUGF("total_cycle=0x%x\r\n",end_t-start_t);
         continue;
       }
-#endif
+
       if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
         if (!free_to_new(slot_idx))
           continue;
@@ -1386,7 +1473,8 @@ scheduler_v30_loop()
       }
     }
     //end_t = read_reg(0x1F70000);
-    //CTRL_DEBUGF("total_cycle=0x%x\r\n",end_t-start_t);    
+    //CTRL_DEBUGF("total_cycle=0x%x\r\n",end_t-start_t);
+    #endif
   } // while
 }
 

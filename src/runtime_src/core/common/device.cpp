@@ -150,12 +150,12 @@ get_axlf_section(axlf_section_kind section, const uuid& xclbin_id) const
 {
   if (xclbin_id && xclbin_id != m_xclbin_uuid)
     throw std::runtime_error("xclbin id mismatch");
-
+#if 0
   for (auto i:m_axlf_sections) {
     if (i.first == section)
      std::cout << i.second.data() << "  " << i.second.size() << std::endl;
   }
-
+#endif
   auto itr = m_axlf_sections.find(section);
   return itr != m_axlf_sections.end()
     ? std::make_pair((*itr).second.data(), (*itr).second.size())
