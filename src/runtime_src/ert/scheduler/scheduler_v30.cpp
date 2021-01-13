@@ -1287,7 +1287,7 @@ scheduler_v30_loop()
                 continue;
 
               CTRL_DEBUGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
-              #if 0
+              #if 1
               if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
                 configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
               else {
