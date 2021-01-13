@@ -509,20 +509,7 @@ setup()
     CQ_STATUS[i] = 0;
     COMPLETE_SLOT[i] = 0;
   }
-#if 0
-  ARGS[4] = 0;
-  ARGS[5] = 0;
-  ARGS[6] = 0;
-  ARGS[7] = 1000;
-  ARGS[8] = 0;
-  ARGS[9] = 0;
-  ARGS[10] = 400;
-  ARGS[11] = 0;
-  ARGS[12] = 400;
-  ARGS[13] = 0;
-  ARGS[14] = 400;
-  ARGS[15] = 0;
-#endif
+
   cu_status.reset();
   cu_ready.reset();
   cu_done.reset();
@@ -571,28 +558,31 @@ setup()
   cu_interrupt_mask.reset();
   bitmask_type intc_ier_mask = 0;
 
-  if (kds_30 && intr) {
+  if (kds_30) {
 
     for (size_type cu=0; cu<num_cus; ++cu) {
       if (cu_idx_to_ctrl(cu) == AP_CTRL_NONE)
         continue;
       write_reg(cu_idx_to_addr(cu) + 0x4, 1);
       write_reg(cu_idx_to_addr(cu) + 0x8, 1);
-      cu_interrupt_mask[cu] = 1;
+      if (intr)
+        cu_interrupt_mask[cu] = 1;
     }
 
-    intc_ier_mask |= 0x1E0; // acccept cu interrupts on bit 1 of the ier of intc
-    enable_master_interrupts = true;
+    if (intr) {
+      intc_ier_mask |= 0x1E0; // acccept cu interrupts on bit 1 of the ier of intc
+      enable_master_interrupts = true;
+
+      write_reg(ERT_INTC_CU_0_31_MER,0x3);            // interrupt controller master enable
+      write_reg(ERT_INTC_CU_32_63_MER,0x3);           // interrupt controller master enable
+      write_reg(ERT_INTC_CU_64_95_MER,0x3);           // interrupt controller master enable
+      write_reg(ERT_INTC_CU_96_127_MER,0x3);          // interrupt controller master enable
+    }
 
     write_reg(ERT_INTC_CU_0_31_IER,0xFFFFFFFF);     // accept interrupts for features
     write_reg(ERT_INTC_CU_32_63_IER,0xFFFFFFFF);    // accept interrupts for features
     write_reg(ERT_INTC_CU_64_95_IER,0xFFFFFFFF);    // accept interrupts for features
     write_reg(ERT_INTC_CU_96_127_IER,0xFFFFFFFF);   // accept interrupts for features
-
-    write_reg(ERT_INTC_CU_0_31_MER,0x3);            // interrupt controller master enable
-    write_reg(ERT_INTC_CU_32_63_MER,0x3);           // interrupt controller master enable
-    write_reg(ERT_INTC_CU_64_95_MER,0x3);           // interrupt controller master enable
-    write_reg(ERT_INTC_CU_96_127_MER,0x3);          // interrupt controller master enable
 
   }
   CTRL_DEBUGF("cu interrupt mask : %s\r\n", "cannot convert"); // to_string throws
@@ -1226,9 +1216,9 @@ scheduler_v30_loop()
               CU_PEND_SLOT[slot.cu_idx][w] |= (1 << (slot_idx%32));
               CTRL_DEBUGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
               level1_idx[slot.cu_idx] |= 1<<w;
-              //slot.header_value = cq_new[slot_idx];
-              //slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
-              //slot.regmap_size = regmap_size(slot.header_value);
+              slot.header_value = val;
+              slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
+              slot.regmap_size = regmap_size(slot.header_value);
             }
             continue;
           }
@@ -1246,8 +1236,8 @@ scheduler_v30_loop()
 
         // check CU done
 
-        for (size_type i=0; i<num_slot_masks; ++i) {
-          value_type cu_mask = read_reg(CU_IPR[i]), cu_offset = i<<5;
+        for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
+          value_type cu_mask = read_reg(CU_IPR[i]);
           CTRL_DEBUGF("cu_mask[%d] = %x \r\n", i, cu_mask);
           for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
             if (cu_mask & 0x1) {
