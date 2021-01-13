@@ -1209,7 +1209,7 @@ scheduler_v30_loop()
                 notify_host(slot_idx);
                 continue;
               }
-              //q_new[slot_idx] = val;
+              //cq_new[slot_idx] = val;
               addr_type addr = cu_section_addr(slot_addr);
               slot.cu_idx = read_reg(addr);
 
@@ -1252,7 +1252,7 @@ scheduler_v30_loop()
               #else
               COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
               #endif
-              cu_status[cu_idx] = !cu_status[cu_idx];              
+              cu_status[cu_idx] = !cu_status[cu_idx];
             }
           }
         }
@@ -1286,7 +1286,8 @@ scheduler_v30_loop()
               if (!(pending_slot & 0x1))
                 continue;
 
-               CTRL_DEBUGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
+              CTRL_DEBUGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
+              #if 0
               if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
                 configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
               else {
@@ -1302,6 +1303,9 @@ scheduler_v30_loop()
               //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
               //cq_new[slot_idx] = 0;
               set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
+              #else
+              start_cu(slot_idx);
+              #endif
               break;
             }
           }
