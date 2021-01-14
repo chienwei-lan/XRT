@@ -517,7 +517,8 @@ static int ert_cfg_cmd(struct xocl_ert_user *ert_user, struct ert_user_command *
 		ERTUSER_INFO(ert_user, "configuring dataflow mode with ert polling\n");
 		cfg->slot_size = ert_user->cq_range / MAX_CUS;
 		cfg->cu_isr = 0;
-		cfg->cu_dma = 0;
+		//cfg->cu_dma = 0;
+		cfg->dsa52 = dsa;
 		ert_user->polling_mode = cfg->polling;
 		ert_user->num_slots = ert_user->cq_range / cfg->slot_size;
 	} else if (ert_full) {

@@ -631,9 +631,9 @@ notify_host(size_type cmd_idx)
 inline void
 configure_cu(addr_type cu_addr, addr_type regmap_addr, size_type regmap_size)
 {
+#if 0
   // write register map, starting at base + 0x10
   // 0x4, 0x8, 0xc used for interrupt, which is initialized in setup
-#ifdef ERT_HW_EMU
   for (size_type idx = 4; idx < regmap_size; ++idx)
     write_reg(cu_addr + (idx << 2), read_reg(regmap_addr + (idx << 2)));
 #else
@@ -1200,8 +1200,9 @@ scheduler_loop()
           auto cqvalue = read_reg(slot.slot_addr);
 
           if (cqvalue & (AP_START)) {
-            write_reg(slot.slot_addr,0x0); // clear
+             write_reg(slot.slot_addr,0x0);
             if (echo) {
+              write_reg(slot.slot_addr,0x0); // clear
               // clear command queue
               notify_host(slot_idx);
               continue;              
@@ -1216,12 +1217,17 @@ scheduler_loop()
             if (slot.opcode==ERT_EXEC_WRITE)
               // Out of order configuration
               configure_cu_ooo(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
+            else if (cu_dma_enabled && (cu_dma_52 || slot.regmap_size<(127+4)))
+              // Use CUDMA and adjust for 5.1 DSAs that have a bug and supports
+              // at most 127 word copy excluding the 4 control words
+              configure_cu_dma(slot.cu_idx,slot_idx,slot.slot_addr);
             else
+              // manually configure and start cu
               configure_cu(cu_idx_to_addr(slot.cu_idx),slot.regmap_addr,slot.regmap_size);
-
-            cu_status[slot.cu_idx] = !cu_status[slot.cu_idx]; // enable polling of this CU
+            
+            cu_status[slot.cu_idx] = !cu_status[slot.cu_idx];     // toggle cu status bit, it is now busy
             set_cu_info(slot.cu_idx,slot_idx); // record which slot cu associated with
-
+            //write_reg(slot.slot_addr,0x0); // clear
           }
         }
 
@@ -1229,7 +1235,7 @@ scheduler_loop()
           continue; // CU is not used
 
         auto cuvalue = read_reg(cu_idx_to_addr(slot.cu_idx));
-        if (!(cuvalue & (AP_DONE|AP_IDLE)))
+        if (!(cuvalue & (AP_DONE)))
           continue;
 
         slot_submitted[slot_idx] = !slot_submitted[slot_idx];
