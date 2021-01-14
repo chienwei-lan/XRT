@@ -1200,7 +1200,6 @@ scheduler_loop()
           auto cqvalue = read_reg(slot.slot_addr);
 
           if (cqvalue & (AP_START)) {
-             write_reg(slot.slot_addr,0x0);
             if (echo) {
               write_reg(slot.slot_addr,0x0); // clear
               // clear command queue
