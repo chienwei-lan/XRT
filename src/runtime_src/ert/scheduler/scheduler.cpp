@@ -834,7 +834,7 @@ configure_mb(size_type slot_idx)
   CTRL_DEBUGF("features=0x%04x\n",features);
   ERT_ASSERT(features & 0x1,"ert is not enabled!!");
   mb_host_interrupt_enabled = (features & 0x2)==0;
-  cu_dma_enabled = (features & 0x4)!=0;
+  cu_dma_enabled = 1;//(features & 0x4)!=0;
   cu_interrupt_enabled = (features & 0x8)!=0;
   cq_status_enabled = (features & 0x10)!=0;
   cdma_enabled = (features & 0x20)!=0;
