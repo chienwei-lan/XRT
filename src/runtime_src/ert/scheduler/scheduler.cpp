@@ -1212,6 +1212,8 @@ scheduler_loop()
             slot.header_value = cqvalue;
             slot.regmap_addr = regmap_section_addr(slot.header_value,slot.slot_addr);
             slot.regmap_size = regmap_size(slot.header_value);
+            //cqvalue &= 0xFFFFFFF;
+            write_reg(slot.slot_addr, (cqvalue & 0xFFFFFFF));
 
             if (slot.opcode==ERT_EXEC_WRITE)
               // Out of order configuration
