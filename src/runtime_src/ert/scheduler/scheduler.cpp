@@ -1228,7 +1228,7 @@ scheduler_loop()
             
             cu_status[slot.cu_idx] = !cu_status[slot.cu_idx];     // toggle cu status bit, it is now busy
             set_cu_info(slot.cu_idx,slot_idx); // record which slot cu associated with
-            //write_reg(slot.slot_addr,0x0); // clear
+            write_reg(slot.slot_addr,0x0); // clear
           }
         }
 
