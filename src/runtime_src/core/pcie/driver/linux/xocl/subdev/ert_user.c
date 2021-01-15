@@ -515,12 +515,12 @@ static int ert_cfg_cmd(struct xocl_ert_user *ert_user, struct ert_user_command *
 
 	if (ert_poll) {
 		ERTUSER_INFO(ert_user, "configuring dataflow mode with ert polling\n");
-		cfg->slot_size = ert_user->cq_range / 16;//MAX_CUS;
+		cfg->slot_size = ert_user->cq_range / 8;//MAX_CUS;
 		cfg->cu_isr = 0;
 		//cfg->cu_dma = 0;
 		cfg->dsa52 = dsa;
 		ert_user->polling_mode = cfg->polling;
-		ert_user->num_slots = 16;//ert_user->cq_range / cfg->slot_size;
+		ert_user->num_slots = 8;//ert_user->cq_range / cfg->slot_size;
 	} else if (ert_full) {
 		ERTUSER_INFO(ert_user, "configuring embedded scheduler mode\n");
 		ert_user->cq_intr = cfg->cq_int;
