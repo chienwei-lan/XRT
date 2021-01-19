@@ -1211,23 +1211,37 @@ inline void compute_unit_complete_check(void)
     if (!cu_mask)
       continue;
     //DMSGF("cu_mask[%d] = %x \r\n", i, cu_mask);
-    if (num_cus == 1) // if num_cus = 1, CU_IPR[0] always equal to 0x2 while complete
-      cu_mask >>= 1;
-    for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
-      if (cu_mask & 0x1) {
-        auto cu_slot = cu_slot_usage[cu_idx];
+    if (num_cus == 1 && cu_mask==0x2) {// if num_cus = 1, CU_IPR[0] always equal to 0x2 while complete
+        auto cu_slot = cu_slot_usage[0];
 
         //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
-        write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
-        write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
+        write_reg(cu_idx_to_addr(0), AP_CONTINUE);
+        write_reg(cu_idx_to_addr(0)+0xC, 0x1); // toggle INTC bit
         //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
         #if 1
         notify_host(cu_slot);
         #else
         COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
         #endif
-        cu_status[cu_idx] = !cu_status[cu_idx];
+        cu_status[0] = !cu_status[0];
+    } else {
+      for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
+        if (cu_mask & 0x1) {
+          auto cu_slot = cu_slot_usage[cu_idx];
+
+          //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
+
+          write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+          write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
+          //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+          #if 1
+          notify_host(cu_slot);
+          #else
+          COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
+          #endif
+          cu_status[cu_idx] = !cu_status[cu_idx];
+        }
       }
     }
 
