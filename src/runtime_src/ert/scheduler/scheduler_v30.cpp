@@ -1244,21 +1244,18 @@ inline void compute_unit_start(void)
 
     if (!mask)
       continue;
+    if (cu_status[cu_idx])
+      break;
 
-    //if (cu_status[cu_idx])
-    //  break;
-
-    for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
-      value_type pending_slot = CU_PEND_SLOT[cu_idx][w];
+    for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
+      value_type pending_slot = CU_PEND_SLOT[cu_idx][i];
       //DMSGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
       if (cu_status[cu_idx])
         break;
-
       if (!pending_slot) {
-        mask &= ~(1<<w);
+        mask &= ~(1<<i);
         continue;
       }
-
       for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
         auto& slot = command_slots[slot_idx];
         
@@ -1282,9 +1279,7 @@ inline void compute_unit_start(void)
         }
         //}
         cu_status[cu_idx] = !cu_status[cu_idx];
-        CU_PEND_SLOT[cu_idx][w] &= ~(1<<slot_idx);
-        //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
-        //cq_new[slot_idx] = 0;
+        CU_PEND_SLOT[cu_idx][i] &= ~(1<<slot_idx);
         set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
         #else
         start_cu(slot_idx);
