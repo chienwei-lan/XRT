@@ -1246,6 +1246,7 @@ scheduler_v30_loop()
               CTRL_DEBUGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
               write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+              write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1);
               //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
               #if 1
               notify_host(cu_slot);
@@ -1255,7 +1256,7 @@ scheduler_v30_loop()
               cu_status[cu_idx] = !cu_status[cu_idx];
             }
           }
-          CTRL_DEBUGF("acknowleged INTC mask\r\n");
+          CTRL_DEBUGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
           if (num_cus==1)
             write_reg(ERT_INTC_CU_0_31_IAR,0x2);
           else
