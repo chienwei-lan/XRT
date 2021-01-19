@@ -1257,6 +1257,7 @@ inline void compute_unit_complete_check(void)
         write_reg(cu_idx_to_addr(0), AP_CONTINUE);
         write_reg(cu_idx_to_addr(0)+0xC, 0x1); // toggle INTC bit
         //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+        cu_submit(0);
         #if 1
         notify_host(cu_slot);
         #else
@@ -1273,6 +1274,7 @@ inline void compute_unit_complete_check(void)
           write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
           write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
           //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+          cu_submit(cu_idx);
           #if 1
           notify_host(cu_slot);
           #else
