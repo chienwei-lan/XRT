@@ -621,7 +621,7 @@ setup()
 inline void
 set_cu_info(size_type cu_idx, size_type slot_idx)
 {
-  DMSGF("cu_slot_usage[%d]=%d\r\n",cu_idx,slot_idx);
+  CTRL_DEBUG("cu_slot_usage[%d]=%d\r\n",cu_idx,slot_idx);
   ERT_ASSERT(cu_slot_usage[cu_idx]==no_index,"cu already used");
   cu_slot_usage[cu_idx] = slot_idx;
   ++cu_usage[cu_idx];
@@ -1237,11 +1237,13 @@ scheduler_v30_loop()
         for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
           value_type cu_mask = read_reg(CU_IPR[i]);
           CTRL_DEBUGF("cu_mask[%d] = %x \r\n", i, cu_mask);
-          for (size_type cu_idx=cu_offset; cu_mask && (num_cus==1 ? cu_idx<2 : cu_idx<num_cus); cu_mask >>= 1, ++cu_idx) {
+          if (num_cus == 1)
+            cu_mask >>= 1;
+          for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
             if (cu_mask & 0x1) {
               auto cu_slot = cu_slot_usage[cu_idx];
 
-              CTRL_DEBUGF("cu[%d] done  cu_slot %d\r\n", i, cu_slot);
+              CTRL_DEBUGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
               write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
               //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
