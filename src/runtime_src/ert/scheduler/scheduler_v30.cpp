@@ -1315,20 +1315,20 @@ scheduler_v30_loop()
     //if (kds_30) {
       //CTRL_DEBUGF("kds_30 new flow \r\n");
       // sync CQ
-      //start_t = read_reg(0x1F70000);
+      start_t = read_reg(0x1F70000);
       command_queue_process();
-      //end_t = read_reg(0x1F70000);
-      //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
+      end_t = read_reg(0x1F70000);
+      CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
       // check CU done
-      //start_t = read_reg(0x1F70000);
+      start_t = read_reg(0x1F70000);
       compute_unit_complete_check();
-      //end_t = read_reg(0x1F70000);
-      //CTRL_DEBUGF("B (%d)\r\n", end_t-start_t);
+      end_t = read_reg(0x1F70000);
+      CTRL_DEBUGF("B (%d)\r\n", end_t-start_t);
       // start CU
-      //start_t = read_reg(0x1F70000);
+      start_t = read_reg(0x1F70000);
       compute_unit_start();
-      //end_t = read_reg(0x1F70000);
-      //CTRL_DEBUGF("C (%d)\r\n", end_t-start_t);
+      end_t = read_reg(0x1F70000);
+      CTRL_DEBUGF("C (%d)\r\n", end_t-start_t);
       //continue;
     //}
 #endif
