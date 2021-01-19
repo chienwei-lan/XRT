@@ -1186,7 +1186,7 @@ scheduler_v30_loop()
   while (1) {
 #if 1
     //if (kds_30) {
-      CTRL_DEBUGF("kds_30 new flow \r\n");
+      //CTRL_DEBUGF("kds_30 new flow \r\n");
       // sync CQ
       for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
         auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[w]);
@@ -1257,7 +1257,7 @@ scheduler_v30_loop()
           }
         }
         // start CU
-        for (size_type cu_idx=0; (num_cus==1 ? cu_idx<2 : cu_idx<num_cus); ++cu_idx) {
+        for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
           value_type level1_mask = level1_idx[cu_idx];
 
           if (!level1_mask)
