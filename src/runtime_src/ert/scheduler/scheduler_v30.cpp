@@ -1236,92 +1236,90 @@ scheduler_v30_loop()
       //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
         // check CU done
 
-        for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
-          value_type cu_mask = read_reg(CU_IPR[i]), bck_cu_mask = cu_mask;
-          //DMSGF("cu_mask[%d] = %x \r\n", i, cu_mask);
-          if (num_cus == 1)
-            cu_mask >>= 1;
-          for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
-            if (cu_mask & 0x1) {
-              auto cu_slot = cu_slot_usage[cu_idx];
+      for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
+        value_type cu_mask = read_reg(CU_IPR[i]), bck_cu_mask = cu_mask;
+        //DMSGF("cu_mask[%d] = %x \r\n", i, cu_mask);
+        if (num_cus == 1)
+          cu_mask >>= 1;
+        for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
+          if (cu_mask & 0x1) {
+            auto cu_slot = cu_slot_usage[cu_idx];
 
-              //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
+            //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
-              write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
-              write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1);
-              //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
-              #if 1
-              notify_host(cu_slot);
-              #else
-              COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
-              #endif
-              cu_status[cu_idx] = !cu_status[cu_idx];
-            }
-          }
-
-          if (bck_cu_mask) {
-            //DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
-            write_reg(ERT_INTC_CU_0_31_IAR,bck_cu_mask);
+            write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+            write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1);
+            //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+            #if 1
+            notify_host(cu_slot);
+            #else
+            COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
+            #endif
+            cu_status[cu_idx] = !cu_status[cu_idx];
           }
         }
-        // start CU
-        for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
-          value_type level1_mask = level1_idx[cu_idx];
 
-          if (!level1_mask)
-            continue;
+        if (bck_cu_mask) {
+          //DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
+          write_reg(ERT_INTC_CU_0_31_IAR,bck_cu_mask);
+        }
+      }
+      // start CU
+      for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
+        value_type level1_mask = level1_idx[cu_idx];
 
+        if (!level1_mask)
+          continue;
+
+        if (cu_status[cu_idx])
+          break;
+
+        for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
+          value_type pending_slot = CU_PEND_SLOT[cu_idx][w];
+          //DMSGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
           if (cu_status[cu_idx])
             break;
 
-          for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
-            value_type pending_slot = CU_PEND_SLOT[cu_idx][w];
-            //DMSGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
+          if (!pending_slot) {
+            level1_mask &= ~(1<<w);
+            continue;
+          }
+
+          for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
+            auto& slot = command_slots[slot_idx];
+            
             if (cu_status[cu_idx])
               break;
 
-            if (!pending_slot) {
-              level1_mask &= ~(1<<w);
+            if (!(pending_slot & 0x1))
               continue;
+
+            //DMSGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
+            #if 1
+            if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
+              configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+            else {
+              //value_type start_t, end_t;
+
+              //start_t = read_reg(0x1F70000);
+              configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+              //end_t = read_reg(0x1F70000);
+              //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
             }
-
-            for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
-              auto& slot = command_slots[slot_idx];
-              
-              if (cu_status[cu_idx])
-                break;
-
-              if (!(pending_slot & 0x1))
-                continue;
-
-              //DMSGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
-              #if 1
-              if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
-                configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
-              else {
-                //value_type start_t, end_t;
-
-                //start_t = read_reg(0x1F70000);
-                configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
-                //end_t = read_reg(0x1F70000);
-                //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
-              }
-              //}
-              cu_status[cu_idx] = !cu_status[cu_idx];
-              CU_PEND_SLOT[cu_idx][w] &= ~(1<<slot_idx);
-              //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
-              //cq_new[slot_idx] = 0;
-              set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
-              #else
-              start_cu(slot_idx);
-              #endif
-              break;
-            }
+            //}
+            cu_status[cu_idx] = !cu_status[cu_idx];
+            CU_PEND_SLOT[cu_idx][w] &= ~(1<<slot_idx);
+            //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
+            //cq_new[slot_idx] = 0;
+            set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
+            #else
+            start_cu(slot_idx);
+            #endif
+            break;
           }
         }
-        //continue;
       }
-
+        //continue;
     //}
 #endif
 #if 0
