@@ -1309,7 +1309,7 @@ scheduler_v30_loop()
   // Basic setup will be changed by configure_mb, but is necessary
   // for even configure_mb() to work.
   setup();
-  value_type start_t, end_t;
+  //value_type start_t, end_t;
   while (1) {
 #if 1
     //if (kds_30) {
