@@ -1178,7 +1178,6 @@ inline void command_queue_process(void)
             notify_host(slot_idx);
             continue;
           }
-          //cq_new[slot_idx] = val;
           addr_type addr = cu_section_addr(slot_addr);
           slot.cu_idx = read_reg(addr);
 
@@ -1209,6 +1208,8 @@ inline void compute_unit_complete_check(void)
 {
   for (size_type i=0, cu_offset=0; i<num_cu_masks; ++i, cu_offset+=32) {
     value_type cu_mask = read_reg(CU_IPR[i]), bck_cu_mask = cu_mask;
+    if (!cu_mask)
+      continue;
     //DMSGF("cu_mask[%d] = %x \r\n", i, cu_mask);
     if (num_cus == 1) // if num_cus = 1, CU_IPR[0] always equal to 0x2 while complete
       cu_mask >>= 1;
@@ -1240,10 +1241,10 @@ inline void compute_unit_complete_check(void)
 inline void compute_unit_start(void)
 {
   for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
-    //value_type mask = level1_idx[cu_idx];
+    value_type mask = level1_idx[cu_idx];
 
-    //if (!mask)
-    //  continue;
+    if (!mask)
+      continue;
 
     if (cu_status[cu_idx])
       break;
@@ -1254,7 +1255,7 @@ inline void compute_unit_start(void)
       if (cu_status[cu_idx])
         break;
       if (!pending_slot) {
-        //level1_idx[cu_idx] &= ~(1<<i);
+        level1_idx[cu_idx] &= ~(1<<i);
         continue;
       }
       for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
