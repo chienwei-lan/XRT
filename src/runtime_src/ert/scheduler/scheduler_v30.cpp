@@ -1319,17 +1319,16 @@ scheduler_v30_loop()
       command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
-      // start CU
-      //start_t = read_reg(0x1F70000);
-      compute_unit_start();
-      //end_t = read_reg(0x1F70000);
-      //CTRL_DEBUGF("C (%d)\r\n", end_t-start_t);
-
       // check CU done
       //start_t = read_reg(0x1F70000);
       compute_unit_completion_check();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("B (%d)\r\n", end_t-start_t);
+      // start CU
+      //start_t = read_reg(0x1F70000);
+      compute_unit_start();
+      //end_t = read_reg(0x1F70000);
+      //CTRL_DEBUGF("C (%d)\r\n", end_t-start_t);
       //continue;
     //}
 #endif
