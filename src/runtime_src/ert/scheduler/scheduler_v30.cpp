@@ -1242,8 +1242,8 @@ inline void compute_unit_start(void)
   for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
     value_type mask = level1_idx[cu_idx];
 
-    if (!mask)
-      continue;
+    //if (!mask)
+    //  continue;
 
     if (cu_status[cu_idx])
       break;
@@ -1254,7 +1254,7 @@ inline void compute_unit_start(void)
       if (cu_status[cu_idx])
         break;
       if (!pending_slot) {
-        level1_idx[cu_idx] &= ~(1<<i);
+        //level1_idx[cu_idx] &= ~(1<<i);
         continue;
       }
       for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
