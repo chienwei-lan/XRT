@@ -572,13 +572,11 @@ setup()
     if (intr) {
       intc_ier_mask |= 0x1E0; // acccept cu interrupts on bit 1 of the ier of intc
       enable_master_interrupts = true;
-
       write_reg(ERT_INTC_CU_0_31_MER,0x3);            // interrupt controller master enable
       write_reg(ERT_INTC_CU_32_63_MER,0x3);           // interrupt controller master enable
       write_reg(ERT_INTC_CU_64_95_MER,0x3);           // interrupt controller master enable
       write_reg(ERT_INTC_CU_96_127_MER,0x3);          // interrupt controller master enable
     }
-
     write_reg(ERT_INTC_CU_0_31_IER,0xFFFFFFFF);     // accept interrupts for features
     write_reg(ERT_INTC_CU_32_63_IER,0xFFFFFFFF);    // accept interrupts for features
     write_reg(ERT_INTC_CU_64_95_IER,0xFFFFFFFF);    // accept interrupts for features
