@@ -1201,7 +1201,7 @@ scheduler_v30_loop()
             value_type slot_addr = slot.slot_addr;
             auto val = read_reg(slot_addr);
             if (val & AP_START) {
-            //write_reg(slot.slot_addr,0x0); // clear
+            write_reg(slot.slot_addr,0x0); // clear
             if (echo) {
               // clear command queue
               notify_host(slot_idx);
