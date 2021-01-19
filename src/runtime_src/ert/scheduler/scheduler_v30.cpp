@@ -1205,7 +1205,7 @@ inline void command_queue_process(void)
   }
 }
 
-inline void compute_unit_completion_check(void)
+inline void compute_unit_complete_check(void)
 {
   for (size_type i=0, cu_offset=0; i<num_cu_masks; ++i, cu_offset+=32) {
     value_type cu_mask = read_reg(CU_IPR[i]), bck_cu_mask = cu_mask;
@@ -1254,7 +1254,7 @@ inline void compute_unit_start(void)
       if (cu_status[cu_idx])
         break;
       if (!pending_slot) {
-        mask &= ~(1<<i);
+        level1_idx[cu_idx] &= ~(1<<i);
         continue;
       }
       for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
@@ -1321,7 +1321,7 @@ scheduler_v30_loop()
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
       // check CU done
       //start_t = read_reg(0x1F70000);
-      compute_unit_completion_check();
+      compute_unit_complete_check();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("B (%d)\r\n", end_t-start_t);
       // start CU
