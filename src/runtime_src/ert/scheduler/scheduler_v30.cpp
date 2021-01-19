@@ -1200,8 +1200,8 @@ scheduler_v30_loop()
           if (slot_idx > 0) {
             value_type slot_addr = slot.slot_addr;
             auto val = read_reg(slot_addr);
-            //if (val & AP_START) {
-              //write_reg(slot.slot_addr,0x0); // clear
+            if (val & AP_START) {
+            //write_reg(slot.slot_addr,0x0); // clear
             if (echo) {
               // clear command queue
               notify_host(slot_idx);
@@ -1216,8 +1216,8 @@ scheduler_v30_loop()
             level1_idx[slot.cu_idx] |= 1<<i;
             slot.header_value = val;
             slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
-              slot.regmap_size = regmap_size(slot.header_value);
-            //}
+            slot.regmap_size = regmap_size(slot.header_value);
+            }
             continue;
           }
 
