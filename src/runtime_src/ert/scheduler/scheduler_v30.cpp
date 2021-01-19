@@ -621,7 +621,7 @@ setup()
 inline void
 set_cu_info(size_type cu_idx, size_type slot_idx)
 {
-  CTRL_DEBUG("cu_slot_usage[%d]=%d\r\n",cu_idx,slot_idx);
+  DMSGF("cu_slot_usage[%d]=%d\r\n",cu_idx,slot_idx);
   ERT_ASSERT(cu_slot_usage[cu_idx]==no_index,"cu already used");
   cu_slot_usage[cu_idx] = slot_idx;
   ++cu_usage[cu_idx];
