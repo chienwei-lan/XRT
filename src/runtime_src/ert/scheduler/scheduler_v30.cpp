@@ -1270,14 +1270,8 @@ inline void compute_unit_start(void)
         #if 1
         if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
           configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
-        else {
-          //value_type start_t, end_t;
-
-          //start_t = read_reg(0x1F70000);
+        else
           configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
-          //end_t = read_reg(0x1F70000);
-          //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
-        }
         //}
         cu_status[cu_idx] = !cu_status[cu_idx];
         CU_PEND_SLOT[cu_idx][i] &= ~(1<<slot_idx);
@@ -1321,20 +1315,21 @@ scheduler_v30_loop()
     //if (kds_30) {
       //CTRL_DEBUGF("kds_30 new flow \r\n");
       // sync CQ
-      start_t = read_reg(0x1F70000);
+      //start_t = read_reg(0x1F70000);
       command_queue_process();
-      end_t = read_reg(0x1F70000);
-      CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
-      // check CU done
-      start_t = read_reg(0x1F70000);
-      compute_unit_completion_check();
-      end_t = read_reg(0x1F70000);
-      CTRL_DEBUGF("B (%d)\r\n", end_t-start_t);
+      //end_t = read_reg(0x1F70000);
+      //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
       // start CU
-      start_t = read_reg(0x1F70000);
+      //start_t = read_reg(0x1F70000);
       compute_unit_start();
-      end_t = read_reg(0x1F70000);
-      CTRL_DEBUGF("C (%d)\r\n", end_t-start_t);
+      //end_t = read_reg(0x1F70000);
+      //CTRL_DEBUGF("C (%d)\r\n", end_t-start_t);
+
+      // check CU done
+      //start_t = read_reg(0x1F70000);
+      compute_unit_completion_check();
+      //end_t = read_reg(0x1F70000);
+      //CTRL_DEBUGF("B (%d)\r\n", end_t-start_t);
       //continue;
     //}
 #endif
