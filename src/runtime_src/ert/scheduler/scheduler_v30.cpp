@@ -1300,6 +1300,7 @@ scheduler_v30_loop()
               }
               //}
               cu_status[cu_idx] = !cu_status[cu_idx];
+              CU_PEND_SLOT[cu_idx][w] &= ~(1<<slot_idx);
               //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
               //cq_new[slot_idx] = 0;
               set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
