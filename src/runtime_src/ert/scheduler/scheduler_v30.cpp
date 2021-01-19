@@ -1235,7 +1235,7 @@ scheduler_v30_loop()
         // check CU done
 
         for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
-          value_type cu_mask = read_reg(CU_IPR[i]);
+          value_type cu_mask = read_reg(CU_IPR[i]), bck_cu_mask = cu_mask;
           CTRL_DEBUGF("cu_mask[%d] = %x \r\n", i, cu_mask);
           if (num_cus == 1)
             cu_mask >>= 1;
@@ -1253,13 +1253,13 @@ scheduler_v30_loop()
               COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
               #endif
               cu_status[cu_idx] = !cu_status[cu_idx];
-
-              if (num_cus==1)
-                write_reg(ERT_INTC_CU_0_31_IAR,0x2);
-              else
-                write_reg(ERT_INTC_CU_0_31_IAR,1<<cu_idx);
             }
           }
+          CTRL_DEBUGF("acknowleged INTC mask\r\n");
+          if (num_cus==1)
+            write_reg(ERT_INTC_CU_0_31_IAR,0x2);
+          else
+            write_reg(ERT_INTC_CU_0_31_IAR,bck_cu_mask);
         }
         // start CU
         for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
