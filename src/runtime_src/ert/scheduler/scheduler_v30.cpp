@@ -1219,7 +1219,7 @@ inline void compute_unit_completion_check(void)
         //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
         write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
-        write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1);
+        write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
         //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
         #if 1
         notify_host(cu_slot);
@@ -1233,6 +1233,64 @@ inline void compute_unit_completion_check(void)
     if (bck_cu_mask) {
       //DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
       write_reg(ERT_INTC_CU_0_31_IAR,bck_cu_mask);
+    }
+  }
+}
+
+inline void compute_unit_start(void)
+{
+  for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
+    value_type mask = level1_idx[cu_idx];
+
+    if (!mask)
+      continue;
+
+    //if (cu_status[cu_idx])
+    //  break;
+
+    for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
+      value_type pending_slot = CU_PEND_SLOT[cu_idx][w];
+      //DMSGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
+      if (cu_status[cu_idx])
+        break;
+
+      if (!pending_slot) {
+        mask &= ~(1<<w);
+        continue;
+      }
+
+      for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
+        auto& slot = command_slots[slot_idx];
+        
+        if (cu_status[cu_idx])
+          break;
+
+        if (!(pending_slot & 0x1))
+          continue;
+
+        //DMSGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
+        #if 1
+        if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
+          configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+        else {
+          //value_type start_t, end_t;
+
+          //start_t = read_reg(0x1F70000);
+          configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
+          //end_t = read_reg(0x1F70000);
+          //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
+        }
+        //}
+        cu_status[cu_idx] = !cu_status[cu_idx];
+        CU_PEND_SLOT[cu_idx][w] &= ~(1<<slot_idx);
+        //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
+        //cq_new[slot_idx] = 0;
+        set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
+        #else
+        start_cu(slot_idx);
+        #endif
+        break;
+      }
     }
   }
 }
@@ -1271,64 +1329,11 @@ scheduler_v30_loop()
       command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
-        // check CU done
+      // check CU done
       compute_unit_completion_check();
       // start CU
-      for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
-        value_type level1_mask = level1_idx[cu_idx];
-
-        if (!level1_mask)
-          continue;
-
-        if (cu_status[cu_idx])
-          break;
-
-        for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
-          value_type pending_slot = CU_PEND_SLOT[cu_idx][w];
-          //DMSGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
-          if (cu_status[cu_idx])
-            break;
-
-          if (!pending_slot) {
-            level1_mask &= ~(1<<w);
-            continue;
-          }
-
-          for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
-            auto& slot = command_slots[slot_idx];
-            
-            if (cu_status[cu_idx])
-              break;
-
-            if (!(pending_slot & 0x1))
-              continue;
-
-            //DMSGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
-            #if 1
-            if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
-              configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
-            else {
-              //value_type start_t, end_t;
-
-              //start_t = read_reg(0x1F70000);
-              configure_cu(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
-              //end_t = read_reg(0x1F70000);
-              //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
-            }
-            //}
-            cu_status[cu_idx] = !cu_status[cu_idx];
-            CU_PEND_SLOT[cu_idx][w] &= ~(1<<slot_idx);
-            //cq_new[cu_slot_usage[slot.cu_idx]] = 0;
-            //cq_new[slot_idx] = 0;
-            set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
-            #else
-            start_cu(slot_idx);
-            #endif
-            break;
-          }
-        }
-      }
-        //continue;
+      compute_unit_start();
+      //continue;
     //}
 #endif
 #if 0
