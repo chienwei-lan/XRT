@@ -1253,6 +1253,11 @@ scheduler_v30_loop()
               COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
               #endif
               cu_status[cu_idx] = !cu_status[cu_idx];
+
+              if (num_cus==1)
+                write_reg(ERT_INTC_CU_0_31_IAR,0x2);
+              else
+                write_reg(ERT_INTC_CU_0_31_IAR,1<<cu_idx);
             }
           }
         }
