@@ -1244,6 +1244,7 @@ inline void compute_unit_start(void)
 
     if (!mask)
       continue;
+
     if (cu_status[cu_idx])
       break;
 
@@ -1314,20 +1315,26 @@ scheduler_v30_loop()
   // Basic setup will be changed by configure_mb, but is necessary
   // for even configure_mb() to work.
   setup();
-  //value_type start_t, end_t;
+  value_type start_t, end_t;
   while (1) {
 #if 1
     //if (kds_30) {
       //CTRL_DEBUGF("kds_30 new flow \r\n");
       // sync CQ
-      //start_t = read_reg(0x1F70000);
+      start_t = read_reg(0x1F70000);
       command_queue_process();
-      //end_t = read_reg(0x1F70000);
-      //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
+      end_t = read_reg(0x1F70000);
+      CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
       // check CU done
+      start_t = read_reg(0x1F70000);
       compute_unit_completion_check();
+      end_t = read_reg(0x1F70000);
+      CTRL_DEBUGF("B (%d)\r\n", end_t-start_t);
       // start CU
+      start_t = read_reg(0x1F70000);
       compute_unit_start();
+      end_t = read_reg(0x1F70000);
+      CTRL_DEBUGF("C (%d)\r\n", end_t-start_t);
       //continue;
     //}
 #endif
