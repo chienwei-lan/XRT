@@ -1190,11 +1190,11 @@ scheduler_v30_loop()
       // sync CQ
       for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
         auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[w]);
-        CTRL_DEBUGF("command queue status: 0x%x\r\n",slot_mask);
+        DMSGF("command queue status: 0x%x\r\n",slot_mask);
         // Transition each new command into new state
 
         for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
-          CTRL_DEBUGF("found slot: %d\r\n",slot_idx);
+          DMSGF("found slot: %d\r\n",slot_idx);
           auto& slot = command_slots[slot_idx];
 
           if (slot_idx > 0) {
@@ -1212,7 +1212,7 @@ scheduler_v30_loop()
               slot.cu_idx = read_reg(addr);
 
               CU_PEND_SLOT[slot.cu_idx][w] |= (1 << (slot_idx%32));
-              CTRL_DEBUGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
+              DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
               level1_idx[slot.cu_idx] |= 1<<w;
               slot.header_value = val;
               slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
@@ -1236,14 +1236,14 @@ scheduler_v30_loop()
 
         for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
           value_type cu_mask = read_reg(CU_IPR[i]), bck_cu_mask = cu_mask;
-          CTRL_DEBUGF("cu_mask[%d] = %x \r\n", i, cu_mask);
+          DMSGF("cu_mask[%d] = %x \r\n", i, cu_mask);
           if (num_cus == 1)
             cu_mask >>= 1;
           for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
             if (cu_mask & 0x1) {
               auto cu_slot = cu_slot_usage[cu_idx];
 
-              CTRL_DEBUGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
+              DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
               write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
               write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1);
@@ -1256,11 +1256,11 @@ scheduler_v30_loop()
               cu_status[cu_idx] = !cu_status[cu_idx];
             }
           }
-          CTRL_DEBUGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
-          if (num_cus==1)
-            write_reg(ERT_INTC_CU_0_31_IAR,0x2);
-          else
+
+          if (bck_cu_mask) {
+            DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
             write_reg(ERT_INTC_CU_0_31_IAR,bck_cu_mask);
+          }
         }
         // start CU
         for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
@@ -1274,7 +1274,7 @@ scheduler_v30_loop()
 
           for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
             value_type pending_slot = CU_PEND_SLOT[cu_idx][w];
-            CTRL_DEBUGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
+            DMSGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
             if (cu_status[cu_idx])
               break;
 
@@ -1292,7 +1292,7 @@ scheduler_v30_loop()
               if (!(pending_slot & 0x1))
                 continue;
 
-              CTRL_DEBUGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
+              DMSGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
               #if 1
               if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
                 configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
