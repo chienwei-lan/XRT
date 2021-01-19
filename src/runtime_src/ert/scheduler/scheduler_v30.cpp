@@ -1182,16 +1182,16 @@ scheduler_v30_loop()
   // Basic setup will be changed by configure_mb, but is necessary
   // for even configure_mb() to work.
   setup();
-
+  //value_type start_t, end_t;
   while (1) {
 #if 1
     //if (kds_30) {
       //CTRL_DEBUGF("kds_30 new flow \r\n");
       // sync CQ
-      for (size_type w=0,offset=0; w<num_slot_masks; ++w,offset+=32) {
-        auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[w]);
+      //start_t = read_reg(0x1F70000);
+      for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
+        auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]);
         //DMSGF("command queue status: 0x%x\r\n",slot_mask);
-        // Transition each new command into new state
 
         for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
           //DMSGF("found slot: %d\r\n",slot_idx);
@@ -1211,9 +1211,9 @@ scheduler_v30_loop()
               addr_type addr = cu_section_addr(slot_addr);
               slot.cu_idx = read_reg(addr);
 
-              CU_PEND_SLOT[slot.cu_idx][w] |= (1 << (slot_idx%32));
+              CU_PEND_SLOT[slot.cu_idx][i] |= (1 << (slot_idx%32));
               //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
-              level1_idx[slot.cu_idx] |= 1<<w;
+              level1_idx[slot.cu_idx] |= 1<<i;
               slot.header_value = val;
               slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
               slot.regmap_size = regmap_size(slot.header_value);
@@ -1231,7 +1231,9 @@ scheduler_v30_loop()
               continue;
           }
         }
-
+      }
+      //end_t = read_reg(0x1F70000);
+      //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
         // check CU done
 
         for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
@@ -1317,7 +1319,7 @@ scheduler_v30_loop()
             }
           }
         }
-        continue;
+        //continue;
       }
 
     //}
