@@ -1240,7 +1240,7 @@ inline void compute_unit_complete_check(void)
 inline void compute_unit_start(void)
 {
   for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
-    value_type mask = level1_idx[cu_idx];
+    //value_type mask = level1_idx[cu_idx];
 
     //if (!mask)
     //  continue;
