@@ -1237,7 +1237,7 @@ scheduler_v30_loop()
         for (size_type i=0, cu_offset=0; i<num_slot_masks; ++i, cu_offset+=32) {
           value_type cu_mask = read_reg(CU_IPR[i]);
           CTRL_DEBUGF("cu_mask[%d] = %x \r\n", i, cu_mask);
-          for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
+          for (size_type cu_idx=cu_offset; cu_mask && if (num_cus==1)) ? cu_idx<2 : cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
             if (cu_mask & 0x1) {
               auto cu_slot = cu_slot_usage[cu_idx];
 
