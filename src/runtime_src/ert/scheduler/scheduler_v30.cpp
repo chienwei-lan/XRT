@@ -1157,6 +1157,54 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
       cu_ready[cmd_idx] = 1;
     }
 }
+
+inline void command_queue_process(void)
+{
+  for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
+    auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]);
+    //DMSGF("command queue status: 0x%x\r\n",slot_mask);
+
+    for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
+      //DMSGF("found slot: %d\r\n",slot_idx);
+      auto& slot = command_slots[slot_idx];
+
+      if (slot_idx > 0) {
+        value_type slot_addr = slot.slot_addr;
+        auto val = read_reg(slot_addr);
+        if (val & AP_START) {
+          write_reg(slot_addr,0x0); // clear
+          if (echo) {
+            // clear command queue
+            notify_host(slot_idx);
+            continue;
+          }
+          //cq_new[slot_idx] = val;
+          addr_type addr = cu_section_addr(slot_addr);
+          slot.cu_idx = read_reg(addr);
+
+          slot.header_value = val;
+          slot.regmap_addr = regmap_section_addr(val,slot_addr);
+          slot.regmap_size = regmap_size(val);
+          CU_PEND_SLOT[slot.cu_idx][i] |= (1 << (slot_idx%32));
+          //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
+          level1_idx[slot.cu_idx] |= 1<<i;
+        }
+        continue;
+      }
+
+      if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
+        if (!free_to_new(slot_idx))
+          continue;
+      }
+
+      if ((slot.header_value & 0xF) == 0x1) { // new
+        if (!new_to_queued(slot_idx))
+          continue;
+      }
+    }
+  }
+}
+
 /**
  * Main routine executed by embedded scheduler loop
  *
@@ -1189,49 +1237,7 @@ scheduler_v30_loop()
       //CTRL_DEBUGF("kds_30 new flow \r\n");
       // sync CQ
       //start_t = read_reg(0x1F70000);
-      for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
-        auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]);
-        //DMSGF("command queue status: 0x%x\r\n",slot_mask);
-
-        for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
-          //DMSGF("found slot: %d\r\n",slot_idx);
-          auto& slot = command_slots[slot_idx];
-
-          if (slot_idx > 0) {
-            value_type slot_addr = slot.slot_addr;
-            auto val = read_reg(slot_addr);
-            if (val & AP_START) {
-            write_reg(slot.slot_addr,0x0); // clear
-            if (echo) {
-              // clear command queue
-              notify_host(slot_idx);
-              continue;
-            }
-            //cq_new[slot_idx] = val;
-            addr_type addr = cu_section_addr(slot_addr);
-            slot.cu_idx = read_reg(addr);
-
-            CU_PEND_SLOT[slot.cu_idx][i] |= (1 << (slot_idx%32));
-            //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
-            level1_idx[slot.cu_idx] |= 1<<i;
-            slot.header_value = val;
-            slot.regmap_addr = regmap_section_addr(slot.header_value,slot_addr);
-            slot.regmap_size = regmap_size(slot.header_value);
-            }
-            continue;
-          }
-
-          if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
-            if (!free_to_new(slot_idx))
-              continue;
-          }
-
-          if ((slot.header_value & 0xF) == 0x1) { // new
-            if (!new_to_queued(slot_idx))
-              continue;
-          }
-        }
-      }
+      command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("time (%d)\r\n", end_t-start_t);
         // check CU done
