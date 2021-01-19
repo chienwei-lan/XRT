@@ -1241,7 +1241,7 @@ scheduler_v30_loop()
             if (cu_mask & 0x1) {
               auto cu_slot = cu_slot_usage[cu_idx];
 
-              CTRL_DEBUGF("cu[%d] done \r\n", i);
+              CTRL_DEBUGF("cu[%d] done  cu_slot %d\r\n", i, cu_slot);
 
               write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
               //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
@@ -1255,7 +1255,7 @@ scheduler_v30_loop()
           }
         }
         // start CU
-        for (size_type cu_idx=0; cu_idx<num_cus; ++cu_idx) {
+        for (size_type cu_idx=0; (num_cus==1 ? cu_idx<2 : cu_idx<num_cus); ++cu_idx) {
           value_type level1_mask = level1_idx[cu_idx];
 
           if (!level1_mask)
