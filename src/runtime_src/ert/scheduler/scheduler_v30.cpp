@@ -1167,7 +1167,7 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
 
 inline void command_queue_process(void)
 {
-  //value_type start_t, end_t;
+  value_type start_t, end_t;
       //command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
@@ -1194,11 +1194,9 @@ inline void command_queue_process(void)
           notify_host(slot_idx);
           continue;
         }
-        //start_t = read_reg(0x1F70000);
+        start_t = read_reg(0x1F70000);
         value_type slot_addr = slot.slot_addr;
         auto val = read_reg(slot_addr);
-        //if (val & AP_START) {
-          //write_reg(slot_addr,0x0); // clear
         addr_type addr = cu_section_addr(slot_addr);
         slot.cu_idx = read_reg(addr);
 
@@ -1208,10 +1206,10 @@ inline void command_queue_process(void)
         CU_PEND_SLOT[slot.cu_idx][i] |= (1 << (slot_idx%32));
         //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
         level1_idx[slot.cu_idx] |= 1<<i;
-        //}
+
+        end_t = read_reg(0x1F70000);
+        CTRL_DEBUGF("A:process slot(%d)\r\n", slot_idx);
         continue;
-        //end_t = read_reg(0x1F70000);
-        //CTRL_DEBUGF("A:process slot(%d)\r\n", slot_idx);    
       }
 
       if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
