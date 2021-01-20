@@ -1270,8 +1270,7 @@ inline void compute_unit_complete_check(void)
 {
   value_type start_t, end_t;
 
-  for (size_type i=0, cu_offset=0; i<num_cu_masks; ++i, cu_offset+=32) {
-    start_t = read_reg(0x1F70000);
+  for (size_type i=0, cu_offset=0; i<num_cu_masks; ++i, cu_offset+=32) { //240 per pass
     value_type cu_mask = read_reg(CU_IPR[i]), cu_ack = cu_mask;
 
     if (!cu_mask)
@@ -1279,7 +1278,7 @@ inline void compute_unit_complete_check(void)
     //DMSGF("cu_mask[%d] = %x \r\n", i, cu_mask);
     if (num_cus == 1)// if num_cus = 1, CU_IPR[0] always equal to 0x2 while complete
       cu_mask>>=1;
-
+    start_t = read_reg(0x1F70000);
     for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
       if (cu_mask & 0x1) {
         auto cu_slot = cu_slot_usage[cu_idx];
@@ -1298,12 +1297,11 @@ inline void compute_unit_complete_check(void)
         cu_status[cu_idx] = !cu_status[cu_idx];
       }
     }
-
+    end_t = read_reg(0x1F70000);
+    CTRL_DEBUGF("B:time (%d)\r\n", end_t-start_t);
     if (cu_ack)
       //DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
       write_reg(CU_IAR[i],cu_ack);
-    end_t = read_reg(0x1F70000);
-    CTRL_DEBUGF("B:time (%d)\r\n", end_t-start_t);
   }
 }
 
