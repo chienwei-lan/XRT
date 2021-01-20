@@ -1181,7 +1181,7 @@ inline void command_queue_process(void)
       continue;
     }
     CTRL_DEBUGF("A:slot_mask (%x)\r\n", slot_mask); // 0x2 =>173, 0x4 => 210 cycles, 0xC=>336 cycles, 0x42=>443
-    start_t = read_reg(0x1F70000);
+    //start_t = read_reg(0x1F70000);
     for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) { // 294
       //DMSGF("found slot: %d\r\n",slot_idx);
       if (!(slot_mask & 0x1))
@@ -1190,26 +1190,29 @@ inline void command_queue_process(void)
       auto& slot = command_slots[slot_idx];
 
       if (slot_idx > 0) {
+        start_t = read_reg(0x1F70000);
         value_type slot_addr = slot.slot_addr;
         auto val = read_reg(slot_addr);
-        if (val & AP_START) {
-          write_reg(slot_addr,0x0); // clear
-          if (echo) {
-            // clear command queue
-            notify_host(slot_idx);
-            continue;
-          }
-          addr_type addr = cu_section_addr(slot_addr);
-          slot.cu_idx = read_reg(addr);
-
-          slot.header_value = val;
-          slot.regmap_addr = regmap_section_addr(val,slot_addr);
-          slot.regmap_size = regmap_size(val);
-          CU_PEND_SLOT[slot.cu_idx][i] |= (1 << (slot_idx%32));
-          //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
-          level1_idx[slot.cu_idx] |= 1<<i;
+        //if (val & AP_START) {
+          //write_reg(slot_addr,0x0); // clear
+        if (echo) {
+          // clear command queue
+          notify_host(slot_idx);
+          continue;
         }
+        addr_type addr = cu_section_addr(slot_addr);
+        slot.cu_idx = read_reg(addr);
+
+        slot.header_value = val;
+        slot.regmap_addr = regmap_section_addr(val,slot_addr);
+        slot.regmap_size = regmap_size(val);
+        CU_PEND_SLOT[slot.cu_idx][i] |= (1 << (slot_idx%32));
+        //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
+        level1_idx[slot.cu_idx] |= 1<<i;
+        //}
         continue;
+        end_t = read_reg(0x1F70000);
+        CTRL_DEBUGF("A:process slot(%d)\r\n", slot_idx);    
       }
 
       if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
@@ -1222,8 +1225,6 @@ inline void command_queue_process(void)
           continue;
       }
     }
-    end_t = read_reg(0x1F70000);
-    CTRL_DEBUGF("A:travse 32 slots(%d)\r\n", end_t-start_t);    
   }
 }
 
