@@ -1167,7 +1167,7 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
 
 inline void command_queue_process(void)
 {
-  value_type start_t, end_t;
+ // value_type start_t, end_t;
       //command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
@@ -1184,7 +1184,7 @@ inline void command_queue_process(void)
     //start_t = read_reg(0x1F70000);
     for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) { // 294
       //DMSGF("found slot: %d\r\n",slot_idx);
-      start_t = read_reg(0x1F70000);
+      //start_t = read_reg(0x1F70000);
       auto& slot = command_slots[slot_idx];
       if (!(slot_mask & 0x1))
         continue;
@@ -1208,8 +1208,8 @@ inline void command_queue_process(void)
         //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
         level1_idx[slot.cu_idx] |= 1<<i;
 
-        end_t = read_reg(0x1F70000);
-        CTRL_DEBUGF("A:time (%d)\r\n", end_t-start_t);
+        //end_t = read_reg(0x1F70000);
+        //CTRL_DEBUGF("A:time (%d)\r\n", end_t-start_t);
         continue;
       }
 
@@ -1268,6 +1268,8 @@ inline void cu_submit_try(value_type cu_idx)
 
 inline void compute_unit_complete_check(void)
 {
+  value_type start_t, end_t;
+  start_t = read_reg(0x1F70000);
   for (size_type i=0, cu_offset=0; i<num_cu_masks; ++i, cu_offset+=32) {
     value_type cu_mask = read_reg(CU_IPR[i]), cu_ack = cu_mask;
 
@@ -1301,6 +1303,8 @@ inline void compute_unit_complete_check(void)
       write_reg(CU_IAR[i],cu_ack);
 
   }
+  end_t = read_reg(0x1F70000);
+  CTRL_DEBUGF("A:time (%d)\r\n", end_t-start_t);
 }
 
 inline void compute_unit_start(void)
