@@ -1189,16 +1189,16 @@ inline void command_queue_process(void)
         continue;
 
       if (slot_idx > 0) {
-        //start_t = read_reg(0x1F70000);
-        value_type slot_addr = slot.slot_addr;
-        auto val = read_reg(slot_addr);
-        //if (val & AP_START) {
-          //write_reg(slot_addr,0x0); // clear
         if (echo) {
           // clear command queue
           notify_host(slot_idx);
           continue;
         }
+        //start_t = read_reg(0x1F70000);
+        value_type slot_addr = slot.slot_addr;
+        auto val = read_reg(slot_addr);
+        //if (val & AP_START) {
+          //write_reg(slot_addr,0x0); // clear
         addr_type addr = cu_section_addr(slot_addr);
         slot.cu_idx = read_reg(addr);
 
