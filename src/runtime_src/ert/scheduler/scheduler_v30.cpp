@@ -1167,7 +1167,7 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
 
 inline void command_queue_process(void)
 {
-  value_type start_t, end_t;
+  //value_type start_t, end_t;
       //command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
@@ -1180,17 +1180,16 @@ inline void command_queue_process(void)
       //CTRL_DEBUGF("A:no slot in used (%d)\r\n", end_t-start_t);
       continue;
     }
-    CTRL_DEBUGF("A:slot_mask (%x)\r\n", slot_mask); // 0x2 =>173, 0x4 => 210 cycles, 0xC=>336 cycles, 0x42=>443
+    //CTRL_DEBUGF("A:slot_mask (%x)\r\n", slot_mask); // 0x2 =>173, 0x4 => 210 cycles, 0xC=>336 cycles, 0x42=>443
     //start_t = read_reg(0x1F70000);
     for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) { // 294
       //DMSGF("found slot: %d\r\n",slot_idx);
+      auto& slot = command_slots[slot_idx];
       if (!(slot_mask & 0x1))
         continue;
 
-      auto& slot = command_slots[slot_idx];
-
       if (slot_idx > 0) {
-        start_t = read_reg(0x1F70000);
+        //start_t = read_reg(0x1F70000);
         value_type slot_addr = slot.slot_addr;
         auto val = read_reg(slot_addr);
         //if (val & AP_START) {
@@ -1211,8 +1210,8 @@ inline void command_queue_process(void)
         level1_idx[slot.cu_idx] |= 1<<i;
         //}
         continue;
-        end_t = read_reg(0x1F70000);
-        CTRL_DEBUGF("A:process slot(%d)\r\n", slot_idx);    
+        //end_t = read_reg(0x1F70000);
+        //CTRL_DEBUGF("A:process slot(%d)\r\n", slot_idx);    
       }
 
       if (!cq_status_enabled && ((slot.header_value & 0xF) == 0x4)) { // free
