@@ -1168,11 +1168,11 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
 inline void command_queue_process(void)
 {
   value_type start_t, end_t;
-  start_t = read_reg(0x1F70000);
       //command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
   for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
+    start_t = read_reg(0x1F70000);
     auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]);
     //DMSGF("command queue status: 0x%x\r\n",slot_mask);
     if (!slot_mask) {
