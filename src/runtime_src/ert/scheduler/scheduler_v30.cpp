@@ -1269,8 +1269,9 @@ inline void cu_submit_try(value_type cu_idx)
 inline void compute_unit_complete_check(void)
 {
   value_type start_t, end_t;
-  start_t = read_reg(0x1F70000);
+
   for (size_type i=0, cu_offset=0; i<num_cu_masks; ++i, cu_offset+=32) {
+    start_t = read_reg(0x1F70000);
     value_type cu_mask = read_reg(CU_IPR[i]), cu_ack = cu_mask;
 
     if (!cu_mask)
@@ -1301,10 +1302,9 @@ inline void compute_unit_complete_check(void)
     if (cu_ack)
       //DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
       write_reg(CU_IAR[i],cu_ack);
-
+    end_t = read_reg(0x1F70000);
+    CTRL_DEBUGF("B:time (%d)\r\n", end_t-start_t);
   }
-  end_t = read_reg(0x1F70000);
-  CTRL_DEBUGF("A:time (%d)\r\n", end_t-start_t);
 }
 
 inline void compute_unit_start(void)
