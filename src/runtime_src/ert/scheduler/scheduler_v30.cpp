@@ -1208,7 +1208,7 @@ inline void command_queue_process(void)
         level1_idx[slot.cu_idx] |= 1<<i;
 
         end_t = read_reg(0x1F70000);
-        CTRL_DEBUGF("A:process slot(%d)\r\n", slot_idx);
+        CTRL_DEBUGF("A:time (%d)\r\n", end_t-start_t);
         continue;
       }
 
