@@ -1171,17 +1171,18 @@ inline void command_queue_process(void)
       //command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
-  for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
-    start_t = read_reg(0x1F70000);
-    auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]);
+  for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {// 56 cycles
+    //start_t = read_reg(0x1F70000);
+    auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]); // 18 cycles
     //DMSGF("command queue status: 0x%x\r\n",slot_mask);
     if (!slot_mask) {
-      end_t = read_reg(0x1F70000);
-      CTRL_DEBUGF("A:no slot in used (%d)\r\n", end_t-start_t);     
+      //end_t = read_reg(0x1F70000);
+      //CTRL_DEBUGF("A:no slot in used (%d)\r\n", end_t-start_t);
       continue;
     }
+    CTRL_DEBUGF("A:slot_mask (%x)\r\n", slot_mask);
     start_t = read_reg(0x1F70000);
-    for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
+    for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) { // 294
       //DMSGF("found slot: %d\r\n",slot_idx);
       auto& slot = command_slots[slot_idx];
 
