@@ -1165,51 +1165,46 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
     }
 }
 
+inline void slot_property_fetch(size_type slot_idx)
+{
+  auto& slot = command_slots[slot_idx];
+  value_type slot_addr = slot.slot_addr;
+  auto header = read_reg(slot_addr);
+  addr_type cu_idx_addr = cu_section_addr(slot_addr);
+
+  slot.cu_idx = read_reg(cu_idx_addr);
+  slot.header_value = header;
+  slot.regmap_addr = regmap_section_addr(header,slot_addr);
+  slot.regmap_size = regmap_size(header);
+}
+
 inline void command_queue_process(void)
 {
- // value_type start_t, end_t;
-      //command_queue_process();
-      //end_t = read_reg(0x1F70000);
-      //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
   for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {// 56 cycles
-    //start_t = read_reg(0x1F70000);
     auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]); // 18 cycles
     //DMSGF("command queue status: 0x%x\r\n",slot_mask);
-    if (!slot_mask) {
-      //end_t = read_reg(0x1F70000);
-      //CTRL_DEBUGF("A:no slot in used (%d)\r\n", end_t-start_t);
+    if (!slot_mask)
       continue;
-    }
-    //CTRL_DEBUGF("A:slot_mask (%x)\r\n", slot_mask); // 0x2 =>173, 0x4 => 210 cycles, 0xC=>336 cycles, 0x42=>443
-    //start_t = read_reg(0x1F70000);
+
     for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) { // 294
       //DMSGF("found slot: %d\r\n",slot_idx);
-      //start_t = read_reg(0x1F70000);
       auto& slot = command_slots[slot_idx];
       if (!(slot_mask & 0x1))
         continue;
 
       if (slot_idx > 0) {
+
         if (echo) {
           // clear command queue
           notify_host(slot_idx);
           continue;
         }
-        //value_type start_t, end_t;
-        value_type slot_addr = slot.slot_addr;
-        auto val = read_reg(slot_addr);
-        addr_type addr = cu_section_addr(slot_addr);
-        slot.cu_idx = read_reg(addr);
 
-        slot.header_value = val;
-        slot.regmap_addr = regmap_section_addr(val,slot_addr);
-        slot.regmap_size = regmap_size(val);
+        slot_property_fetch(slot_idx);
         CU_PEND_SLOT[slot.cu_idx][i] |= (1 << (slot_idx%32));
         //DMSGF("CU_PEND_SLOT[%d][%d] = %x\r\n",slot.cu_idx, w, CU_PEND_SLOT[slot.cu_idx][w]);
         level1_idx[slot.cu_idx] |= 1<<i;
 
-        //end_t = read_reg(0x1F70000);
-        //CTRL_DEBUGF("A:time (%d)\r\n", end_t-start_t);
         continue;
       }
 
@@ -1249,7 +1244,6 @@ inline void cu_submit_try(value_type cu_idx)
         continue;
 
       //DMSGF("kick start cu %d, slot %d\r\n",cu_idx, slot_idx);
-      #if 1
       if (slot.opcode==ERT_EXEC_WRITE) // Out of order configuration
         configure_cu_ooo(cu_idx_to_addr(cu_idx),slot.regmap_addr,slot.regmap_size);
       else
@@ -1258,9 +1252,6 @@ inline void cu_submit_try(value_type cu_idx)
       cu_status[cu_idx] = !cu_status[cu_idx];
       CU_PEND_SLOT[cu_idx][i] &= ~(1<<slot_idx);
       set_cu_info(cu_idx,slot_idx); // record which slot cu associated with
-      #else
-      start_cu(slot_idx);
-      #endif
       break;
     }
   }
@@ -1280,22 +1271,24 @@ inline void compute_unit_complete_check(void)
       cu_mask>>=1;
     start_t = read_reg(0x1F70000);
     for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
-      if (cu_mask & 0x1) {
-        auto cu_slot = cu_slot_usage[cu_idx];
+      auto cu_slot = cu_slot_usage[cu_idx];
 
-        //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
+      if (!(cu_mask & 0x1))
+        continue;
 
-        write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
-        write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
-        //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+      //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
-        #if 1
-        notify_host(cu_slot);
-        #else
-        COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
-        #endif
-        cu_status[cu_idx] = !cu_status[cu_idx];
-      }
+      write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+      write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
+      //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
+
+      #if 1
+      notify_host(cu_slot);
+      #else
+      COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
+      #endif
+      cu_status[cu_idx] = !cu_status[cu_idx];
+
     }
     end_t = read_reg(0x1F70000);
     CTRL_DEBUGF("B:time (%d)\r\n", end_t-start_t);
