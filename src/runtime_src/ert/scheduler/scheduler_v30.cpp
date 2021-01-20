@@ -1204,7 +1204,7 @@ inline void command_queue_process(void)
   }
 }
 
-inline void cu_submit(value_type cu_idx)
+inline void cu_submit_try(value_type cu_idx)
 {
   for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
     value_type pending_slot = CU_PEND_SLOT[cu_idx][i];
@@ -1245,43 +1245,30 @@ inline void cu_submit(value_type cu_idx)
 inline void compute_unit_complete_check(void)
 {
   for (size_type i=0, cu_offset=0; i<num_cu_masks; ++i, cu_offset+=32) {
-    value_type cu_mask = read_reg(CU_IPR[i]), bck_cu_mask = cu_mask;
+    value_type cu_mask = read_reg(CU_IPR[i]), cu_ack = cu_mask;
+
     if (!cu_mask)
       continue;
     //DMSGF("cu_mask[%d] = %x \r\n", i, cu_mask);
-    if (num_cus == 1 && cu_mask==0x2) {// if num_cus = 1, CU_IPR[0] always equal to 0x2 while complete
-        auto cu_slot = cu_slot_usage[0];
+    if (num_cus == 1)// if num_cus = 1, CU_IPR[0] always equal to 0x2 while complete
+      cu_mask>>=1;
+
+    for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
+      if (cu_mask & 0x1) {
+        auto cu_slot = cu_slot_usage[cu_idx];
 
         //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
 
-        write_reg(cu_idx_to_addr(0), AP_CONTINUE);
-        write_reg(cu_idx_to_addr(0)+0xC, 0x1); // toggle INTC bit
+        write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
+        write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
         //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
-        cu_submit(0);
+
         #if 1
         notify_host(cu_slot);
         #else
         COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
         #endif
-        cu_status[0] = !cu_status[0];
-    } else {
-      for (size_type cu_idx=cu_offset; cu_mask && cu_idx<num_cus; cu_mask >>= 1, ++cu_idx) {
-        if (cu_mask & 0x1) {
-          auto cu_slot = cu_slot_usage[cu_idx];
-
-          //DMSGF("cu[%d] done  cu_slot %d\r\n", cu_idx, cu_slot);
-
-          write_reg(cu_idx_to_addr(cu_idx), AP_CONTINUE);
-          write_reg(cu_idx_to_addr(cu_idx)+0xC, 0x1); // toggle INTC bit
-          //CTRL_DEBUGF(" cu done slot %d, current slot %d\r\n",cu_slot, slot_idx);
-          cu_submit(cu_idx);
-          #if 1
-          notify_host(cu_slot);
-          #else
-          COMPLETE_SLOT[cu_slot>>5] |= (1<<(cu_slot));
-          #endif
-          cu_status[cu_idx] = !cu_status[cu_idx];
-        }
+        cu_status[cu_idx] = !cu_status[cu_idx];
       }
     }
 
@@ -1303,7 +1290,7 @@ inline void compute_unit_start(void)
     if (cu_status[cu_idx])
       break;
 
-    cu_submit(cu_idx);
+    cu_submit_try(cu_idx);
   }
 }
 /**
