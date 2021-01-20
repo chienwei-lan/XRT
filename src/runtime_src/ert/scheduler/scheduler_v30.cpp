@@ -144,6 +144,8 @@ addr_type CQ_STATUS_REGISTER_ADDR[4] = {0, 0, 0, 0};
 
 addr_type CU_IPR[4] = {0, 0, 0, 0};
 
+addr_type CU_IAR[4] = {0, 0, 0, 0};
+
 value_type CQ_STATUS[4] = {0, 0, 0, 0};
 
 value_type COMPLETE_SLOT[4] = {0, 0, 0, 0};
@@ -454,6 +456,11 @@ setup_ert_base_addr()
   CU_IPR[1] = ERT_INTC_CU_32_63_IPR;
   CU_IPR[2] = ERT_INTC_CU_64_95_IPR;
   CU_IPR[3] = ERT_INTC_CU_96_127_IPR;
+  CU_IAR[0] = ERT_INTC_CU_0_31_IAR;
+  CU_IAR[1] = ERT_INTC_CU_32_63_IAR;
+  CU_IAR[2] = ERT_INTC_CU_64_95_IAR;
+  CU_IAR[3] = ERT_INTC_CU_96_127_IAR;
+
 }
 
 /**
@@ -1160,10 +1167,20 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
 
 inline void command_queue_process(void)
 {
+  value_type start_t, end_t;
+  start_t = read_reg(0x1F70000);
+      //command_queue_process();
+      //end_t = read_reg(0x1F70000);
+      //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
   for (size_type i=0,offset=0; i<num_slot_masks; ++i,offset+=32) {
     auto slot_mask = read_reg(CQ_STATUS_REGISTER_ADDR[i]);
     //DMSGF("command queue status: 0x%x\r\n",slot_mask);
-
+    if (!slot_mask) {
+      end_t = read_reg(0x1F70000);
+      CTRL_DEBUGF("A:no slot in used (%d)\r\n", end_t-start_t);     
+      continue;
+    }
+    start_t = read_reg(0x1F70000);
     for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) {
       //DMSGF("found slot: %d\r\n",slot_idx);
       auto& slot = command_slots[slot_idx];
@@ -1201,6 +1218,8 @@ inline void command_queue_process(void)
           continue;
       }
     }
+    end_t = read_reg(0x1F70000);
+    CTRL_DEBUGF("A:travse 32 slots(%d)\r\n", end_t-start_t);    
   }
 }
 
@@ -1211,10 +1230,12 @@ inline void cu_submit_try(value_type cu_idx)
     //DMSGF("CU_PEND_SLOT[%d][%d]: %x\r\n",cu_idx, w, pending_slot);
     if (cu_status[cu_idx])
       break;
+
     if (!pending_slot) {
       level1_idx[cu_idx] &= ~(1<<i);
       continue;
     }
+
     for (size_type slot_idx=offset; pending_slot; pending_slot>>=1, ++slot_idx) {
       auto& slot = command_slots[slot_idx];
       
@@ -1272,10 +1293,10 @@ inline void compute_unit_complete_check(void)
       }
     }
 
-    if (cu_ack) {
+    if (cu_ack)
       //DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
-      write_reg(ERT_INTC_CU_0_31_IAR,cu_ack);
-    }
+      write_reg(CU_IAR[i],cu_ack);
+
   }
 }
 
