@@ -1272,9 +1272,9 @@ inline void compute_unit_complete_check(void)
       }
     }
 
-    if (bck_cu_mask) {
+    if (cu_ack) {
       //DMSGF("acknowleged INTC mask. num_cus %d\r\n",num_cus);
-      write_reg(ERT_INTC_CU_0_31_IAR,bck_cu_mask);
+      write_reg(ERT_INTC_CU_0_31_IAR,cu_ack);
     }
   }
 }
