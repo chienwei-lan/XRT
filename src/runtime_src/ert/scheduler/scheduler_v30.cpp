@@ -1167,7 +1167,6 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
 
 inline void command_queue_process(void)
 {
-  value_type start_t, end_t;
       //command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
@@ -1194,6 +1193,7 @@ inline void command_queue_process(void)
           notify_host(slot_idx);
           continue;
         }
+        value_type start_t, end_t;
         start_t = read_reg(0x1F70000);
         value_type slot_addr = slot.slot_addr;
         auto val = read_reg(slot_addr);
