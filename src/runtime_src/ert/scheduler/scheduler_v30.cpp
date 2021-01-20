@@ -1167,6 +1167,7 @@ inline void cu_hls_ctrl_check(size_type cmd_idx)
 
 inline void command_queue_process(void)
 {
+  value_type start_t, end_t;
       //command_queue_process();
       //end_t = read_reg(0x1F70000);
       //CTRL_DEBUGF("A (%d)\r\n", end_t-start_t);
@@ -1183,6 +1184,7 @@ inline void command_queue_process(void)
     //start_t = read_reg(0x1F70000);
     for (size_type slot_idx=offset; slot_mask; slot_mask >>= 1, ++slot_idx) { // 294
       //DMSGF("found slot: %d\r\n",slot_idx);
+      start_t = read_reg(0x1F70000);
       auto& slot = command_slots[slot_idx];
       if (!(slot_mask & 0x1))
         continue;
@@ -1193,8 +1195,7 @@ inline void command_queue_process(void)
           notify_host(slot_idx);
           continue;
         }
-        value_type start_t, end_t;
-        start_t = read_reg(0x1F70000);
+        //value_type start_t, end_t;
         value_type slot_addr = slot.slot_addr;
         auto val = read_reg(slot_addr);
         addr_type addr = cu_section_addr(slot_addr);
