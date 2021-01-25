@@ -79,6 +79,7 @@ struct ert_30_command {
 	struct list_head    list;
 	uint32_t	slot_idx;
 	bool		completed;
+	uint8_t		   state;
 };
 
 struct xocl_ert_30 {
@@ -104,6 +105,8 @@ struct xocl_ert_30 {
 	struct list_head	pq;
 	spinlock_t		pq_lock;
 	u32			num_pq;
+	uint8_t			pq_state;
+	bool			sq_go;
 	/*
 	 * Pending Q is used in thread that is submitting CU cmds.
 	 * Other Qs are used in thread that is completing them.
@@ -115,12 +118,14 @@ struct xocl_ert_30 {
 	/* run queue */
 	struct list_head	rq;
 	u32			num_rq;
+	uint8_t			rq_state;
 
 	struct semaphore	sem;
 	/* submitted queue */
 	struct list_head	sq;
 	struct ert_30_command	*submit_queue[ERT_MAX_SLOTS];
 	u32			num_sq;
+	uint8_t			sq_state;
 
 	struct list_head	cq;
 	u32			num_cq;
@@ -134,13 +139,26 @@ struct xocl_ert_30 {
 	uint32_t 		ert_dmsg;
 	uint32_t		echo;
 	uint32_t		intr;
+
+	uint32_t		completed;
+	uint32_t		submitted;
+
+	uint64_t		start;
+	uint64_t		end;
+
+	uint64_t                pq_itr;
+	uint64_t		sq_itr;
+
 };
 
+static void ert_30_submit(struct kds_ert *ert, struct kds_command *xcmd);
 static ssize_t name_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	//struct xocl_ert_30 *ert_30 = platform_get_drvdata(to_platform_device(dev));
-	return sprintf(buf, "ert_30");
+	struct xocl_ert_30 *ert_30 = platform_get_drvdata(to_platform_device(dev));
+
+	return sprintf(buf, "p:%d, r:%d, s:%d c:%d submitted:%d\n", ert_30->num_pq, ert_30->num_rq, ert_30->num_sq
+		,ert_30->num_cq, ert_30->submitted);
 }
 
 static DEVICE_ATTR_RO(name);
@@ -149,9 +167,13 @@ static ssize_t snap_shot_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
 	struct xocl_ert_30 *ert_30 = platform_get_drvdata(to_platform_device(dev));
+	uint64_t pq_itr = ert_30->pq_itr, sq_itr = ert_30->sq_itr, cmp = ert_30->completed;
+	ert_30->pq_itr = 0;
+	ert_30->sq_itr = 0;
+	ert_30->completed = 0;
 
-	return sprintf(buf, "pending:%d, running:%d, submit:%d complete:%d\n", ert_30->num_pq, ert_30->num_rq, ert_30->num_sq
-		,ert_30->num_cq);
+	return sprintf(buf, "pending:%d, running:%d, submit:%d complete:%d pq:%lld, sq:%lld complete %lld\n", ert_30->num_pq, ert_30->num_rq, ert_30->num_sq
+		,ert_30->num_cq, pq_itr, sq_itr, cmp);
 }
 
 static DEVICE_ATTR_RO(snap_shot);
@@ -294,16 +316,17 @@ static void ert_30_reset(struct xocl_ert_30 *ert_30);
 
 static void ert_30_free_cmd(struct ert_30_command* ecmd)
 {
-	kfree(ecmd);
+	//kfree(ecmd);
 }
 
 static struct ert_30_command* ert_30_alloc_cmd(struct kds_command *xcmd)
 {
-	struct ert_30_command* ecmd = kzalloc(sizeof(struct ert_30_command), GFP_KERNEL);
+	struct ert_30_command* ecmd;// = kzalloc(sizeof(struct ert_30_command), GFP_KERNEL);
 
-	if (!ecmd)
-		return NULL;
+	//if (!ecmd)
+		//return NULL;
 
+	ecmd = (void*)xcmd+sizeof(struct kds_command);
 	ecmd->xcmd = xcmd;
 
 	return ecmd;
@@ -321,7 +344,7 @@ cmd_opcode(struct ert_30_command *ecmd)
 	return ecmd->xcmd->opcode;
 }
 
-
+#if 0
 /* Use for flush queue */
 static inline void
 flush_queue(struct list_head *q, u32 *len, int status, void *client)
@@ -343,6 +366,7 @@ flush_queue(struct list_head *q, u32 *len, int status, void *client)
 		--(*len);
 	}
 }
+#endif
 /*
  * release_slot_idx() - Release specified slot idx
  */
@@ -394,7 +418,7 @@ static inline void process_ert_cq(struct xocl_ert_30 *ert_30)
 		list_del(&ecmd->list);
 		xcmd = ecmd->xcmd;
 		ert_release_slot(ert_30, ecmd);
-		xcmd->cb.notify_host(xcmd, KDS_COMPLETED);
+		xcmd->cb.notify_host(xcmd, ecmd->state);
 		xcmd->cb.free(xcmd);
 		ert_30_free_cmd(ecmd);
 		--ert_30->num_cq;
@@ -402,7 +426,6 @@ static inline void process_ert_cq(struct xocl_ert_30 *ert_30)
 
 	ERTUSER_DBG(ert_30, "<- %s\n", __func__);
 }
-
 
 /**
  * process_ert_sq() - Process cmd witch is submitted
@@ -416,18 +439,37 @@ static inline void process_ert_sq(struct xocl_ert_30 *ert_30)
 	if (!ert_30->num_sq)
 		return;
 
+	ert_30->sq_itr++;
 	ERTUSER_DBG(ert_30, "-> %s\n", __func__);
-	list_for_each_entry_safe(ecmd, next, &ert_30->sq, list) {
-		if (ecmd->completed) {
+
+
+	if (ert_30->sq_state == ERT_STATE_BAD) {
+		void* client = ert_30->ev.client;
+
+		list_for_each_entry_safe(ecmd, next, &ert_30->sq, list) {
 			xcmd = ecmd->xcmd;
+			if (client && client != xcmd->client)
+				continue;
+			ecmd->state = KDS_ABORT;
 			ERTUSER_DBG(ert_30, "%s -> ecmd %llx xcmd%p\n", __func__, (u64)ecmd, xcmd);
 			list_move_tail(&ecmd->list, &ert_30->cq);
 			--ert_30->num_sq;
 			++ert_30->num_cq;
 			ert_30->submit_queue[ecmd->slot_idx] = NULL;
-			/* If it's the first completed command, up the semaphore */
-			if (ert_30->num_cq == 1)
-				up(&ert_30->sem);
+		}
+		ert_30->sq_state = ERT_STATE_GOOD;
+	}
+
+
+	list_for_each_entry_safe(ecmd, next, &ert_30->sq, list) {
+		if (ecmd->completed) {
+			xcmd = ecmd->xcmd;
+			ecmd->state = KDS_COMPLETED;
+			ERTUSER_DBG(ert_30, "%s -> ecmd %llx xcmd%p\n", __func__, (u64)ecmd, xcmd);
+			list_move_tail(&ecmd->list, &ert_30->cq);
+			--ert_30->num_sq;
+			++ert_30->num_cq;
+			ert_30->submit_queue[ecmd->slot_idx] = NULL;
 		}
 	}
 	ERTUSER_DBG(ert_30, "<- %s\n", __func__);
@@ -460,10 +502,16 @@ ert_30_isr(int irq, void *arg)
 	BUG_ON(irq>=ERT_MAX_SLOTS);
 
 	if (!ert_30->polling_mode) {
-
+		//ERTUSER_INFO(ert_30, "irq %d\n", irq);
 		ecmd = ert_30->submit_queue[irq];
-		if (ecmd)
+		if (ecmd) {
 			ecmd->completed = true;
+			ert_30->completed++;
+		} else {
+			//ert_30->end = ktime_get_ns();
+
+			ERTUSER_ERR(ert_30, "not in submitted queue %d, %lld\n", irq, ert_30->end-ert_30->start);
+		}
 
 		up(&ert_30->sem);
 		/* wake up all scheduler ... currently one only */
@@ -516,6 +564,7 @@ static inline void process_ert_sq_polling(struct xocl_ert_30 *ert_30)
 				ecmd = ert_30->submit_queue[cmd_idx];
 				if (ecmd) {
 					xcmd = ecmd->xcmd;
+					ecmd->state = KDS_COMPLETED;
 					ERTUSER_DBG(ert_30, "%s -> ecmd %llx xcmd%p\n", __func__, (u64)ecmd, xcmd);
 					list_move_tail(&ecmd->list, &ert_30->cq);
 					--ert_30->num_sq;
@@ -579,6 +628,12 @@ ert30_acquire_slot(struct xocl_ert_30 *ert_30, struct ert_30_command *ecmd)
 	return (ecmd->slot_idx = ert_acquire_slot_idx(ert_30));
 }
 
+
+static void free_calib_cmd(struct kds_command *xcmd)
+{
+	vfree(xcmd->execbuf);
+	vfree(xcmd);
+}
 
 static int ert_cfg_cmd(struct xocl_ert_30 *ert_30, struct ert_30_command *ecmd)
 {
@@ -679,7 +734,8 @@ static int ert_cfg_cmd(struct xocl_ert_30 *ert_30, struct ert_30_command *ecmd)
 
 	// TODO: reset all queues
 	ert_30_reset(ert_30);
-
+	ert_30->completed = 0;
+	ert_30->submitted = 0;
 	return 0;
 }
 /**
@@ -695,12 +751,29 @@ static inline int process_ert_rq(struct xocl_ert_30 *ert_30)
 	u32 slot_addr = 0, i;
 	struct ert_packet *epkt = NULL;
 	xdev_handle_t xdev = xocl_get_xdev(ert_30->pdev);
+	uint32_t cq_status_offset, cq_status_mask, mask_idx;
+	struct kds_command *xcmd;
 
 	if (!ert_30->num_rq)
 		return 0;
 
-	list_for_each_entry_safe(ecmd, next, &ert_30->rq, list) {
+	if (ert_30->rq_state == ERT_STATE_BAD) {
+		void* client = ert_30->ev.client;
 
+		list_for_each_entry_safe(ecmd, next, &ert_30->rq, list) {
+			xcmd = ecmd->xcmd;
+			if (client && client != xcmd->client)
+				continue;
+			ecmd->state = KDS_ABORT;
+			ERTUSER_DBG(ert_30, "%s -> ecmd %llx xcmd%p\n", __func__, (u64)ecmd, xcmd);
+			list_move_tail(&ecmd->list, &ert_30->cq);
+			--ert_30->num_rq;
+			++ert_30->num_cq;
+		}
+		ert_30->rq_state = ERT_STATE_GOOD;
+	}
+
+	list_for_each_entry_safe(ecmd, next, &ert_30->rq, list) {
 		if (cmd_opcode(ecmd) == OP_CONFIG) {
 			if (ert_cfg_cmd(ert_30, ecmd)) {
 				struct kds_command *xcmd;
@@ -734,6 +807,12 @@ static inline int process_ert_rq(struct xocl_ert_30 *ert_30)
 		}
 		slot_addr = ecmd->slot_idx * (ert_30->cq_range/ert_30->num_slots);
 
+		mask_idx = mask_idx32(ecmd->slot_idx);
+		cq_status_offset = 0x58+(mask_idx<<2); 
+
+		cq_status_mask = (1 << idx_in_mask32(ecmd->slot_idx,mask_idx));
+		//printk(KERN_ERR "cq_status_offset %x cq_status_mask %x", cq_status_offset, cq_status_mask);
+
 		/* Hardware could be pretty fast, add to sq before touch the CQ_status or cmd queue*/
 		list_move_tail(&ecmd->list, &ert_30->sq);
 		ert_30->submit_queue[ecmd->slot_idx] = ecmd;
@@ -757,6 +836,7 @@ static inline int process_ert_rq(struct xocl_ert_30 *ert_30)
 			}
 
 			iowrite32(epkt->header, ert_30->cq_base + slot_addr);
+			xocl_intc_ert_write32(xdev, cq_status_mask, cq_status_offset);
 		}
 		if (ert_30->cq_intr) {
 			u32 mask_idx = mask_idx32(ecmd->slot_idx);
@@ -782,14 +862,36 @@ static inline int process_ert_rq(struct xocl_ert_30 *ert_30)
 static inline void process_ert_pq(struct xocl_ert_30 *ert_30)
 {
 	unsigned long flags;
+	struct ert_30_command *ecmd, *next;
+	struct kds_command *xcmd;
 
 	/* Get pending queue command number without lock.
 	 * The idea is to reduce the possibility of conflict on lock.
 	 * Need to check pending command number again after lock.
 	 */
-	if (!ert_30->num_pq)
+	if (ert_30->num_rq !=0 || !ert_30->num_pq)
 		return;
+
+	ert_30->pq_itr++;
 	spin_lock_irqsave(&ert_30->pq_lock, flags);
+
+	if (ert_30->pq_state == ERT_STATE_BAD) {
+		void* client = ert_30->ev.client;
+
+		list_for_each_entry_safe(ecmd, next, &ert_30->rq, list) {
+			xcmd = ecmd->xcmd;
+			if (client && client != xcmd->client)
+				continue;
+			ecmd->state = KDS_ABORT;
+			ERTUSER_DBG(ert_30, "%s -> ecmd %llx xcmd%p\n", __func__, (u64)ecmd, xcmd);
+			list_move_tail(&ecmd->list, &ert_30->cq);
+			--ert_30->num_pq;
+			++ert_30->num_cq;
+		}
+
+		ert_30->pq_state = ERT_STATE_GOOD;
+	}
+
 	if (ert_30->num_pq) {
 		list_splice_tail_init(&ert_30->pq, &ert_30->rq);
 		ert_30->num_rq += ert_30->num_pq;
@@ -809,17 +911,21 @@ static inline void process_ert_pq(struct xocl_ert_30 *ert_30)
  */
 static inline void process_event(struct xocl_ert_30 *ert_30)
 {
-	void *client = NULL;
+	//void *client = NULL;
 
 	mutex_lock(&ert_30->ev.lock);
 	if (!ert_30->ev.client)
 		goto done;
 
-	client = ert_30->ev.client;
+	//client = ert_30->ev.client;
 
-	flush_queue(&ert_30->rq, &ert_30->num_rq, KDS_ABORT, client);
+	ert_30->pq_state = ERT_STATE_BAD;
+	ert_30->rq_state = ERT_STATE_BAD;
+	ert_30->sq_state = ERT_STATE_BAD;
+	//flush_queue(&ert_30->rq, &ert_30->num_rq, KDS_ABORT, client);
 
 	/* Let's check submitted commands one more time */
+	#if 0
 	process_ert_sq(ert_30);
 	process_ert_sq_polling(ert_30);
 	if (ert_30->num_sq) {
@@ -829,10 +935,10 @@ static inline void process_event(struct xocl_ert_30 *ert_30)
 
 	while (ert_30->num_cq)
 		process_ert_cq(ert_30);
-
+	#endif
 	/* Maybe pending queue has commands of this client */
-	process_ert_pq(ert_30);
-	flush_queue(&ert_30->pq, &ert_30->num_pq, KDS_ABORT, client);
+	//process_ert_pq(ert_30);
+	//flush_queue(&ert_30->pq, &ert_30->num_pq, KDS_ABORT, client);
 
 	if (!ert_30->ev.state)
 		ert_30->ev.state = ERT_STATE_GOOD;
@@ -877,58 +983,41 @@ int ert_30_thread(void *data)
 {
 	struct xocl_ert_30 *ert_30 = (struct xocl_ert_30 *)data;
 	int ret = 0;
-	bool polling_sleep = false, intr_sleep = false;
+	bool polling_sleep = false, intr_sleep = false, no_completed_cmd = false, cant_submit = false, no_need_to_fetch_new_cmd = false;
 
 	while (!ert_30->stop) {
 		/* Make sure to submit as many commands as possible.
 		 * This is why we call continue here. This is important to make
 		 * CU busy, especially CU has hardware queue.
 		 */
-		if (process_ert_rq(ert_30))
-			continue;
+		process_ert_rq(ert_30);
 		/* process completed queue before submitted queue, for
 		 * two reasons:
 		 * - The last submitted command may be still running
 		 * - while handling completed queue, running command might done
 		 * - process_ert_sq_polling will check CU status, which is thru slow bus
 		 */
-		process_ert_cq(ert_30);
-
 		process_ert_sq(ert_30);
 		process_ert_sq_polling(ert_30);
+		process_ert_cq(ert_30);		
 		process_event(ert_30);
-
-		if (ert_30->bad_state)
-			break;
-
-		if (ert_30->num_rq)
-			continue;
 
 		/* ert polling mode goes to sleep only if it doesn't have to poll
 		 * submitted queue to check the completion
 		 * ert interrupt mode goes to sleep if there is no cmd to be submitted
 		 * OR submitted queue is full
 		 */
-		intr_sleep = (!ert_30->num_rq || ert_30->num_sq == (ert_30->num_slots-1));
+		no_completed_cmd = !ert_30->num_cq;
+		cant_submit = !ert_30->num_rq || (ert_30->num_sq == (ert_30->num_slots-1));
+		no_need_to_fetch_new_cmd = ert_30->num_rq !=0 || !ert_30->num_pq;
+
+		intr_sleep = no_completed_cmd || no_need_to_fetch_new_cmd || cant_submit;
 		polling_sleep = (ert_30->polling_mode && !ert_30->num_sq);
-		if (intr_sleep || polling_sleep)
+
+		//printk(KERN_ERR "intr_sleep %d ert_30->num_sq %d", intr_sleep, ert_30->num_sq);
+		if (intr_sleep || polling_sleep) 
 			if (down_interruptible(&ert_30->sem))
 				ret = -ERESTARTSYS;
-
-		process_ert_pq(ert_30);
-	}
-
-	if (!ert_30->bad_state)
-		return ret;
-
-	/* CU in bad state mode, abort all new commands */
-	flush_queue(&ert_30->sq, &ert_30->num_sq, KDS_ABORT, NULL);
-	while (!ert_30->stop) {
-		flush_queue(&ert_30->rq, &ert_30->num_rq, KDS_ABORT, NULL);
-		process_event(ert_30);
-
-		if (down_interruptible(&ert_30->sem))
-			ret = -ERESTARTSYS;
 
 		process_ert_pq(ert_30);
 	}
@@ -937,7 +1026,7 @@ int ert_30_thread(void *data)
 }
 
 /**
- * xocl_ert_30_abort() - Sent an abort event to CU thread
+ * xocl_ert_30_abort() - Sent an abort event to ERT thread
  * @ert_30: Target XRT CU
  * @client: The client tries to abort commands
  *
@@ -1054,7 +1143,7 @@ static int ert_30_probe(struct platform_device *pdev)
 	ert_30->ev.client = NULL;
 
 	sema_init(&ert_30->sem, 0);
-	ert_30->thread = kthread_run(ert_30_thread, ert_30, "xrt_thread");
+	ert_30->thread = kthread_run(ert_30_thread, ert_30, "ert_thread");
 
 	platform_set_drvdata(pdev, ert_30);
 	mutex_init(&ert_30->lock);

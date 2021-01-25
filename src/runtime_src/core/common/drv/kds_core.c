@@ -442,7 +442,7 @@ struct kds_command *kds_alloc_command(struct kds_client *client, u32 size)
 	xcmds = client->xcmds;
 	xcmd = &xcmds[client->xcmd_idx];
 #else
-	xcmd = kzalloc(sizeof(struct kds_command), GFP_KERNEL);
+	xcmd = kzalloc(sizeof(struct kds_command)+64, GFP_KERNEL);
 	if (!xcmd)
 		return NULL;
 #endif
