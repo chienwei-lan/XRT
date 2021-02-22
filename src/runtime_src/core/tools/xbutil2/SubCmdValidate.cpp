@@ -690,6 +690,18 @@ ert_validate(const std::shared_ptr<xrt_core::device>& _dev, xclDeviceHandle hand
   if(!bist_alloc_execbuf_and_wait(handle, ERT_MB_VALIDATE, _ptTest))
     return false;
 
+  auto cq_write_cnt = xrt_core::device_query<xrt_core::query::ert_cq_write>(_dev);
+  auto cq_read_cnt = xrt_core::device_query<xrt_core::query::ert_cq_read>(_dev);
+  auto cu_write_cnt = xrt_core::device_query<xrt_core::query::ert_cu_write>(_dev);
+  auto cu_read_cnt = xrt_core::device_query<xrt_core::query::ert_cu_read>(_dev);
+
+
+  logger(_ptTest, " ",  boost::str(boost::format("CQ read: %d cycles" % cq_read_cnt)));
+  logger(_ptTest, " ",  boost::str(boost::format("CQ write: %d cycles" % cq_write_cnt)));
+  logger(_ptTest, " ",  boost::str(boost::format("CU read: %d cycles" % cu_read_cnt)));
+  logger(_ptTest, " ",  boost::str(boost::format("CU write: %d cycles" % cu_write_cnt)));
+
+
   const uint32_t go_sleep = 1, wake_up = 0;
   xrt_core::device_update<xrt_core::query::ert_sleep>(_dev.get(), go_sleep);
 

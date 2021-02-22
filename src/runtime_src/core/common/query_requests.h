@@ -202,8 +202,11 @@ enum class key_type
   mailbox_metrics,
   clock_timestamp,
   ert_sleep,
+  ert_cq_write,
+  ert_cq_read,
+  ert_cu_write,
+  ert_cu_read,
   noop
-
 };
 
 class no_such_key : public std::exception
@@ -2105,6 +2108,42 @@ struct ert_sleep : request
   virtual void
   put(const device*, const boost::any&) const = 0;
 
+};
+
+struct ert_cq_read : request
+{
+  using result_type = uint64_t;
+  static const key_type key = key_type::ert_cq_read;
+
+  virtual boost::any
+  get(const device*) const = 0;
+};
+
+struct ert_cq_write : request
+{
+  using result_type = uint64_t;
+  static const key_type key = key_type::ert_cq_write;
+
+  virtual boost::any
+  get(const device*) const = 0;
+};
+
+struct ert_cu_read : request
+{
+  using result_type = uint64_t;
+  static const key_type key = key_type::ert_cu_read;
+
+  virtual boost::any
+  get(const device*) const = 0;
+};
+
+struct ert_cu_write : request
+{
+  using result_type = uint64_t;
+  static const key_type key = key_type::ert_cu_write;
+
+  virtual boost::any
+  get(const device*) const = 0;
 };
 
 struct noop : request
