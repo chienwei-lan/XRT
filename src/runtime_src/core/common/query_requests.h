@@ -2149,6 +2149,15 @@ struct ert_cu_write : request
   get(const device*) const = 0;
 };
 
+struct ert_memcpy : request
+{
+  using result_type = uint64_t;
+  static const key_type key = key_type::ert_memcpy;
+
+  virtual boost::any
+  get(const device*) const = 0;
+};
+
 struct noop : request
 {
   using result_type = uint64_t;
