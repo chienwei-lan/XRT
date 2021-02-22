@@ -1076,6 +1076,14 @@ validate_mb(value_type slot_idx)
   end_t = read_clk_counter();
   mb_bist.cu_write_single = (end_t-start_t)/cnt; 
 
+#if 0
+  write_reg(ERT_INTC_IER_ADDR, 0x4);
+  write_reg(ERT_INTC_MER_ADDR,0x1);
+  microblaze_enable_interrupts();
+  intc_start = read_clk_counter();
+  write_reg(ERT_INTC_ADDR, 0x4);
+#endif
+
   slot.header_value = (slot.header_value & ~0xF) | 0x4;
 
   memcpy(addr_ptr, &mb_bist, sizeof(struct mb_validation));
@@ -1093,6 +1101,7 @@ clock_calib_mb(value_type slot_idx)
 
   slot.header_value = (slot.header_value & ~0xF) | 0x4;
   memcpy(addr_ptr, &mb_bist, sizeof(struct mb_validation));
+
   notify_host(slot_idx);
   return true;
 }
@@ -1277,7 +1286,7 @@ scheduler_v30_loop()
 
 #ifdef ERT_HW_EMU
       reg_access_wait();
-#endif
+#endif  
       if (polling && slot_idx>0 && kds_30) {
 
         if (!slot_cache[slot_idx])
@@ -1394,6 +1403,17 @@ cu_interrupt_handler()
     }
   }
 
+#if 0
+  if (intc_mask & 0x4) {
+    //CTRL_DEBUGF("Xbutil bist interrupt test routine\r\n");
+    write_reg(ERT_INTC_MER_ADDR,0x0);
+    microblaze_disable_interrupts();
+    intc_end = read_reg(0x1F70000);
+    //intc_flag = 1;
+    CTRL_DEBUGF("interrupt latency %d\r\n", intc_end - intc_start);
+    mb_bist.irq_latency = intc_end - intc_start;
+  } 
+#endif
   for (size_type intc_bit=0x20; intc_bit<0x200; intc_bit <<= 1) {
 
     if (intc_mask & intc_bit) { // INTC_CU_0_31 ~ INTC_CU_96_127
@@ -1437,6 +1457,7 @@ cu_interrupt_handler()
         write_reg(ERT_INTC_CU_96_127_IAR,cu_intc_mask);
     }
   }
+
   // Acknowledge interrupts
   write_reg(ERT_INTC_IAR_ADDR,intc_mask);
 }

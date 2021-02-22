@@ -152,7 +152,7 @@ struct xocl_ert_user {
 };
 
 static void ert_user_submit(struct kds_ert *ert, struct kds_command *xcmd);
-static uint32_t ert_user_gpio_cfg(struct platform_device *pdev, enum ert_gpio_cfg type);
+static int32_t ert_user_gpio_cfg(struct platform_device *pdev, enum ert_gpio_cfg type);
 
 static ssize_t clock_timestamp_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
@@ -334,16 +334,16 @@ static struct attribute_group ert_user_attr_group = {
 	.attrs = ert_user_attrs,
 };
 
-static uint32_t ert_user_gpio_cfg(struct platform_device *pdev, enum ert_gpio_cfg type)
+static int32_t ert_user_gpio_cfg(struct platform_device *pdev, enum ert_gpio_cfg type)
 {
 	struct xocl_ert_user *ert_user = platform_get_drvdata(pdev);
 	xdev_handle_t xdev = xocl_get_xdev(ert_user->pdev);
-	uint32_t ret = 0, val = 0;
+	int32_t ret = 0, val = 0;
 	int i;
 
 	if (!ert_user->cfg_gpio) {
 		ERTUSER_ERR(ert_user, "%s ERT config gpio not found\n", __func__);
-		return 0;
+		return -ENODEV;
 	}
 	mutex_lock(&ert_user->lock);
 	val = ioread32(ert_user->cfg_gpio);
@@ -533,7 +533,7 @@ static inline void process_ert_cq(struct xocl_ert_user *ert_user)
 
 	while (ert_user->num_cq) {
 		ecmd = list_first_entry(&ert_user->cq, struct ert_user_command, list);
-		list_del(&ecmd->list);
+		list_del(&ecmd->list); 
 		xcmd = ecmd->xcmd;
 		ert_post_process(ert_user, ecmd);
 		ert_release_slot(ert_user, ecmd);
@@ -545,7 +545,6 @@ static inline void process_ert_cq(struct xocl_ert_user *ert_user)
 
 	ERTUSER_DBG(ert_user, "<- %s\n", __func__);
 }
-
 
 /**
  * process_ert_sq() - Process cmd witch is submitted
@@ -787,7 +786,6 @@ ert_acquire_slot(struct xocl_ert_user *ert_user, struct ert_user_command *ecmd)
 	return (ecmd->slot_idx = ert_acquire_slot_idx(ert_user));
 }
 
-
 static int ert_cfg_cmd(struct xocl_ert_user *ert_user, struct ert_user_command *ecmd)
 {
 	xdev_handle_t xdev = xocl_get_xdev(ert_user->pdev);
@@ -887,7 +885,6 @@ static int ert_cfg_cmd(struct xocl_ert_user *ert_user, struct ert_user_command *
 
 	// TODO: reset all queues
 	ert_user_reset(ert_user);
-
 	return 0;
 }
 /**
