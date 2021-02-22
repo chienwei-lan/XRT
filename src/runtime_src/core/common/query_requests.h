@@ -200,12 +200,15 @@ enum class key_type
   aie_metadata,
   graph_status,
   mailbox_metrics,
+
   clock_timestamp,
   ert_sleep,
   ert_cq_write,
   ert_cq_read,
   ert_cu_write,
   ert_cu_read,
+  ert_memcpy,
+
   noop
 };
 

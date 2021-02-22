@@ -694,12 +694,14 @@ ert_validate(const std::shared_ptr<xrt_core::device>& _dev, xclDeviceHandle hand
   auto cq_read_cnt = xrt_core::device_query<xrt_core::query::ert_cq_read>(_dev);
   auto cu_write_cnt = xrt_core::device_query<xrt_core::query::ert_cu_write>(_dev);
   auto cu_read_cnt = xrt_core::device_query<xrt_core::query::ert_cu_read>(_dev);
+  auto memcpy_cnt = xrt_core::device_query<xrt_core::query::ert_memcpy>(_dev);
 
 
-  logger(_ptTest, " ",  boost::str(boost::format("CQ read: %d cycles") % cq_read_cnt));
-  logger(_ptTest, " ",  boost::str(boost::format("CQ write: %d cycles") % cq_write_cnt));
-  logger(_ptTest, " ",  boost::str(boost::format("CU read: %d cycles") % cu_read_cnt));
-  logger(_ptTest, " ",  boost::str(boost::format("CU write: %d cycles") % cu_write_cnt));
+  logger(_ptTest, "Details",  boost::str(boost::format("CQ read: %d cycles") % cq_read_cnt));
+  logger(_ptTest, "Details",  boost::str(boost::format("CQ write: %d cycles") % cq_write_cnt));
+  logger(_ptTest, "Details",  boost::str(boost::format("CU read: %d cycles") % cu_read_cnt));
+  logger(_ptTest, "Details",  boost::str(boost::format("CU write: %d cycles") % cu_write_cnt));
+  logger(_ptTest, "Details",  boost::str(boost::format("Memcpy 128 bytes: %d cycles") % memcpy_cnt));
 
 
   const uint32_t go_sleep = 1, wake_up = 0;
