@@ -201,6 +201,7 @@ enum class key_type
   graph_status,
   mailbox_metrics,
   clock_timestamp,
+  ert_sleep,
   noop
 
 };
@@ -2089,6 +2090,21 @@ struct mailbox_metrics : request
   {
     return value;
   }
+};
+
+struct ert_sleep : request
+{
+  using result_type = uint32_t;  // get value type
+  using value_type = uint32_t;   // put value type
+
+  static const key_type key = key_type::ert_sleep;
+
+  virtual boost::any
+  get(const device*) const = 0;
+
+  virtual void
+  put(const device*, const boost::any&) const = 0;
+
 };
 
 struct noop : request

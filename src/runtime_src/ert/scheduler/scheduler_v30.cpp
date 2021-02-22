@@ -210,6 +210,11 @@ static value_type intr                      = 0;
 
 static value_type polling                   = 1;
 
+static value_type intc_start                = 0;
+
+static value_type intc_end                  = 0;
+
+//static value_type intc_flag                  = 0;
 // Struct slot_info is per command slot in command queue
 struct slot_info
 {
@@ -284,6 +289,9 @@ static bitset_type cu_ready;
 static bitset_type cu_done;
 // Bitmask for interrupt enabled CUs.  (0) no interrupt (1) enabled
 static bitset_type cu_interrupt_mask;
+
+static value_type memcpy_test_dummy[128];
+
 #ifndef ERT_HW_EMU
 /**
  * Utility to read a 32 bit value from any axi-lite peripheral
@@ -1022,6 +1030,71 @@ abort_mb(size_type slot_idx)
   return true;
 }
 
+static inline void 
+write_in_loop(addr_type addr, value_type loop_cnt)
+{
+  while (loop_cnt--)
+    write_reg(addr, 0x0);
+}
+
+static inline void 
+read_in_loop(addr_type addr, value_type loop_cnt)
+{
+  while (loop_cnt--)
+    read_reg(addr);
+}
+
+static bool
+validate_mb(value_type slot_idx)
+{
+  auto& slot = command_slots[slot_idx];
+  value_type start_t, end_t, cnt = 1024;
+  void *addr_ptr = (void *)(uintptr_t)(slot.slot_addr);
+
+  start_t = read_clk_counter();
+  memcpy(memcpy_test_dummy, addr_ptr, 128);
+  end_t = read_clk_counter();
+  mb_bist.memcpy_128 =  end_t-start_t;
+
+  start_t = read_clk_counter();
+  memcpy(memcpy_test_dummy, addr_ptr, 512);
+  end_t = read_clk_counter();
+  mb_bist.memcpy_512 =  end_t-start_t;
+
+  start_t = read_clk_counter();
+  read_in_loop(slot.slot_addr, cnt);
+  end_t = read_clk_counter();
+  mb_bist.cq_read_single = (end_t-start_t)/cnt;
+   
+  start_t = read_clk_counter();
+  write_in_loop(slot.slot_addr, cnt);
+  end_t = read_clk_counter();
+  mb_bist.cq_write_single = (end_t-start_t)/cnt;
+
+  start_t = read_clk_counter();
+  read_in_loop(cu_idx_to_addr(0), cnt);
+  end_t = read_clk_counter();
+  mb_bist.cu_read_single = (end_t-start_t)/cnt;
+
+  start_t = read_clk_counter();
+  write_in_loop(cu_idx_to_addr(0), cnt);
+  end_t = read_clk_counter();
+  mb_bist.cu_write_single = (end_t-start_t)/cnt;
+
+#if 0
+  write_reg(ERT_INTC_IER_ADDR, 0x4);
+  write_reg(ERT_INTC_MER_ADDR,0x1);
+  microblaze_enable_interrupts();
+  intc_start = read_clk_counter();
+  write_reg(ERT_INTC_ADDR, 0x4);
+#endif
+
+  slot.header_value = (slot.header_value & ~0xF) | 0x4;
+
+  memcpy(addr_ptr, &mb_bist, sizeof(struct mb_validation));
+  notify_host(slot_idx);
+  return true;
+}
 
 static bool
 clock_calib_mb(value_type slot_idx)
@@ -1033,6 +1106,7 @@ clock_calib_mb(value_type slot_idx)
 
   slot.header_value = (slot.header_value & ~0xF) | 0x4;
   memcpy(addr_ptr, &mb_bist, sizeof(struct mb_validation));
+
   notify_host(slot_idx);
   return true;
 }
@@ -1059,6 +1133,8 @@ process_special_command(value_type opcode, size_type slot_idx)
     return abort_mb(slot_idx);
   if (opcode==ERT_CLK_CALIB)
     return clock_calib_mb(slot_idx);
+  if (opcode==ERT_MB_VALIDATE)
+    return validate_mb(slot_idx);
   return false;
 }
 
@@ -1215,7 +1291,7 @@ scheduler_v30_loop()
 
 #ifdef ERT_HW_EMU
       reg_access_wait();
-#endif
+#endif  
       if (polling && slot_idx>0 && kds_30) {
 
         if (!slot_cache[slot_idx])
@@ -1332,6 +1408,17 @@ cu_interrupt_handler()
     }
   }
 
+#if 0
+  if (intc_mask & 0x4) {
+    //CTRL_DEBUGF("Xbutil bist interrupt test routine\r\n");
+    write_reg(ERT_INTC_MER_ADDR,0x0);
+    microblaze_disable_interrupts();
+    intc_end = read_reg(0x1F70000);
+    //intc_flag = 1;
+    CTRL_DEBUGF("interrupt latency %d\r\n", intc_end - intc_start);
+    mb_bist.irq_latency = intc_end - intc_start;
+  } 
+#endif
   for (size_type intc_bit=0x20; intc_bit<0x200; intc_bit <<= 1) {
 
     if (intc_mask & intc_bit) { // INTC_CU_0_31 ~ INTC_CU_96_127
@@ -1375,6 +1462,7 @@ cu_interrupt_handler()
         write_reg(ERT_INTC_CU_96_127_IAR,cu_intc_mask);
     }
   }
+
   // Acknowledge interrupts
   write_reg(ERT_INTC_IAR_ADDR,intc_mask);
 }

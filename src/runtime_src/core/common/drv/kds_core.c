@@ -272,7 +272,7 @@ kds_submit_ert(struct kds_sched *kds, struct kds_command *xcmd)
 	int cu_idx;
 
 	/* BUG_ON(!ert || !ert->submit); */
-
+	//kds_err(xcmd->client, "%s xcmd->opcode %d", __func__, xcmd->opcode);
 	switch (xcmd->opcode) {
 	case OP_START:
 		/* KDS should select a CU and set it in cu_mask */
@@ -287,7 +287,6 @@ kds_submit_ert(struct kds_sched *kds, struct kds_command *xcmd)
 		ret = kds_cu_config(&kds->cu_mgmt, xcmd);
 		if (ret)
 			return ret;
-
 		mutex_lock(&ert->lock);
 		if (!ert->configured)
 			ert->submit(ert, xcmd);
@@ -301,12 +300,13 @@ kds_submit_ert(struct kds_sched *kds, struct kds_command *xcmd)
 	case OP_CONFIG_SK:
 	case OP_START_SK:
 	case OP_CLK_CALIB:
+	case OP_VALIDATE:
 		break;
 	default:
 		kds_err(xcmd->client, "Unknown opcode");
 		return -EINVAL;
 	}
-
+	//kds_err(xcmd->client, "wtf %s", __func__);
 	ert->submit(ert, xcmd);
 	return 0;
 }
@@ -514,6 +514,7 @@ int kds_add_command(struct kds_sched *kds, struct kds_command *xcmd)
 
 	/* TODO: Check if command is blocked */
 
+	//kds_err(client, "xcmd->type %d", xcmd->type);
 	/* Command is good to submit */
 	switch (xcmd->type) {
 	case KDS_CU:
@@ -526,7 +527,7 @@ int kds_add_command(struct kds_sched *kds, struct kds_command *xcmd)
 		kds_err(client, "Unknown type");
 		err = -EINVAL;
 	}
-
+	//kds_err(client, "err %d", err);
 	if (err) {
 		xcmd->cb.notify_host(xcmd, KDS_ERROR);
 		xcmd->cb.free(xcmd);

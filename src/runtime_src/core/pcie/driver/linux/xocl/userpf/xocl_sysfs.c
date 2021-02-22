@@ -289,6 +289,7 @@ kds_interrupt_store(struct device *dev, struct device_attribute *da,
 	if (kds->cu_intr == cu_intr)
 		goto done;
 
+	printk(KERN_ERR "ohoh");
 	if (cu_intr) {
 		xocl_ert_user_mb_sleep(xdev);
 		xocl_ert_user_cu_intr_cfg(xdev);

@@ -639,7 +639,7 @@ bist_alloc_execbuf_and_wait(xclDeviceHandle handle, enum ert_cmd_opcode opcode, 
     return false;
   }
 
-  auto ecmd = reinterpret_cast<ert_mb_validate_cmd*>(boptr);
+  auto ecmd = reinterpret_cast<ert_validate_cmd*>(boptr);
 
   std::memset(ecmd, 0, bo_size);
   ecmd->opcode = opcode;
@@ -684,6 +684,28 @@ clock_calibration(const std::shared_ptr<xrt_core::device>& _dev, xclDeviceHandle
   return true;
 }
 
+static bool 
+ert_validate(const std::shared_ptr<xrt_core::device>& _dev, xclDeviceHandle handle, boost::property_tree::ptree& _ptTest)
+{
+  if(!bist_alloc_execbuf_and_wait(handle, ERT_MB_VALIDATE, _ptTest))
+    return false;
+
+  const uint32_t go_sleep = 1, wake_up = 0;
+  xrt_core::device_update<xrt_core::query::ert_sleep>(_dev.get(), go_sleep);
+
+  auto mb_status = xrt_core::device_query<xrt_core::query::ert_sleep>(_dev);
+  if (!mb_status) {
+      _ptTest.put("status", "failed");
+      logger(_ptTest, "Error", "Failed to put ERT to sleep");
+      return false;
+  }
+
+  logger(_ptTest, "Details",  boost::str(boost::format("Put ERT into sleep successfully")));
+
+  xrt_core::device_update<xrt_core::query::ert_sleep>(_dev.get(), wake_up);
+
+  return true;
+}
 /*
  * TEST #1
  */
@@ -960,6 +982,9 @@ hostMemBandwidthKernelTest(const std::shared_ptr<xrt_core::device>& _dev, boost:
   runTestCase(_dev, "host_mem_23_bandwidth.py", _ptTest.get<std::string>("xclbin"), _ptTest);
 }
 
+
+
+
 /*
  * TEST #10
  */
@@ -972,8 +997,14 @@ bistTest(const std::shared_ptr<xrt_core::device>& _dev, boost::property_tree::pt
 
   xclbin_lock xclbin_lock(_dev);
 
-  if (clock_calibration(_dev, _dev->get_device_handle(), _ptTest))
-     _ptTest.put("status", "passed");
+  if (!clock_calibration(_dev, _dev->get_device_handle(), _ptTest))
+     _ptTest.put("status", "failed");
+
+  if (!ert_validate(_dev, _dev->get_device_handle(), _ptTest))
+    _ptTest.put("status", "failed");
+
+
+  _ptTest.put("status", "passed");
 
 }
 
