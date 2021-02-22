@@ -210,11 +210,6 @@ static value_type intr                      = 0;
 
 static value_type polling                   = 1;
 
-static value_type intc_start                = 0;
-
-static value_type intc_end                  = 0;
-
-//static value_type intc_flag                  = 0;
 // Struct slot_info is per command slot in command queue
 struct slot_info
 {
