@@ -696,10 +696,10 @@ ert_validate(const std::shared_ptr<xrt_core::device>& _dev, xclDeviceHandle hand
   auto cu_read_cnt = xrt_core::device_query<xrt_core::query::ert_cu_read>(_dev);
 
 
-  logger(_ptTest, " ",  boost::str(boost::format("CQ read: %d cycles" % cq_read_cnt)));
-  logger(_ptTest, " ",  boost::str(boost::format("CQ write: %d cycles" % cq_write_cnt)));
-  logger(_ptTest, " ",  boost::str(boost::format("CU read: %d cycles" % cu_read_cnt)));
-  logger(_ptTest, " ",  boost::str(boost::format("CU write: %d cycles" % cu_write_cnt)));
+  logger(_ptTest, " ",  boost::str(boost::format("CQ read: %d cycles") % cq_read_cnt));
+  logger(_ptTest, " ",  boost::str(boost::format("CQ write: %d cycles") % cq_write_cnt));
+  logger(_ptTest, " ",  boost::str(boost::format("CU read: %d cycles") % cu_read_cnt));
+  logger(_ptTest, " ",  boost::str(boost::format("CU write: %d cycles") % cu_write_cnt));
 
 
   const uint32_t go_sleep = 1, wake_up = 0;
