@@ -613,6 +613,7 @@ static int xclmgmt_icap_get_data_impl(struct xclmgmt_dev *lro, void *buf)
 	hwicap->freq_cntr_2 = xocl_icap_get_data(lro, FREQ_COUNTER_2);
 	hwicap->mig_calib = lro->ready ? xocl_icap_get_data(lro, MIG_CALIB) : 0;
 	hwicap->data_retention = xocl_icap_get_data(lro, DATA_RETAIN);
+	hwicap->load_sched = xocl_icap_get_data(lro, LOAD_SCHED);
 
 	XOCL_PUT_XCLBIN_ID(lro);
 
