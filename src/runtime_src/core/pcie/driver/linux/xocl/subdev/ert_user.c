@@ -1537,6 +1537,12 @@ static int ert_user_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	if (!xocl_icap_get_data(xdev, LOAD_SCHED)) {
+		xocl_err(&pdev->dev, "ERT firmware not loaded, unable to probe ert");
+		return -ENODEV;		
+	}
+
+
 	ert_user = xocl_drvinst_alloc(&pdev->dev, sizeof(struct xocl_ert_user));
 	if (!ert_user)
 		return -ENOMEM;
