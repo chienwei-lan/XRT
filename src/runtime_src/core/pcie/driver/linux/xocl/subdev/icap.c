@@ -3457,12 +3457,17 @@ static ssize_t load_sched_show(struct device *dev,
 	struct icap *icap = platform_get_drvdata(to_platform_device(dev));
 	u64 val = 0;
 
+	if (!ICAP_PRIVILEGED(icap)){
+		val = icap_get_data(to_platform_device(dev), LOAD_SCHED);
+		goto done;
+	}
+
 	mutex_lock(&icap->icap_lock);
 
 	val = icap->load_sched;
 
 	mutex_unlock(&icap->icap_lock);
-
+done:
 	return sprintf(buf, "%llu\n", val);
 }
 static DEVICE_ATTR_RO(load_sched);
