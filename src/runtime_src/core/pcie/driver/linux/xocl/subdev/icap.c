@@ -188,6 +188,8 @@ struct icap {
 	wait_queue_head_t	reader_wq;
 
 	uint32_t		data_retention;
+
+	bool			load_sched;
 };
 
 static inline u32 reg_rd(void __iomem *reg)
@@ -1032,6 +1034,8 @@ static int icap_download_boot_firmware(struct platform_device *pdev)
 
 	if (load_mgmt || load_sched)
 		xocl_mb_reset(xdev);
+
+	icap->load_sched = load_sched;
 
 	/* save BMC version */
 	(void)sprintf(icap->bmc_header.m_version, "%s", NONE_BMC_VERSION);
@@ -2946,6 +2950,9 @@ static uint64_t icap_get_data_nolock(struct platform_device *pdev,
 		case DATA_RETAIN:
 			target = (uint64_t)icap->cache.data_retention;
 			break;
+		case LOAD_SCHED:
+			target = (uint64_t)icap->cache.load_sched;
+			break;
 		default:
 			break;
 		}
@@ -2985,6 +2992,9 @@ static uint64_t icap_get_data_nolock(struct platform_device *pdev,
 			break;
 		case DATA_RETAIN:
 			target = (uint64_t)icap->data_retention;
+			break;
+		case LOAD_SCHED:
+			target = (uint64_t)icap->load_sched;
 			break;
 		default:
 			break;
@@ -3441,6 +3451,22 @@ static ssize_t max_host_mem_aperture_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(max_host_mem_aperture);
 
+static ssize_t load_sched_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct icap *icap = platform_get_drvdata(to_platform_device(dev));
+	u64 val = 0;
+
+	mutex_lock(&icap->icap_lock);
+
+	val = icap->load_sched;
+
+	mutex_unlock(&icap->icap_lock);
+
+	return sprintf(buf, "%llu\n", val);
+}
+static DEVICE_ATTR_RO(load_sched);
+
 static struct attribute *icap_attrs[] = {
 	&dev_attr_clock_freqs.attr,
 	&dev_attr_idcode.attr,
@@ -3451,6 +3477,7 @@ static struct attribute *icap_attrs[] = {
 	&dev_attr_reader_cnt.attr,
 	&dev_attr_data_retention.attr,
 	&dev_attr_max_host_mem_aperture.attr,
+	&dev_attr_load_sched.attr,
 	NULL,
 };
 

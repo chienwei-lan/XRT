@@ -210,6 +210,7 @@ struct xcl_pr_region {
 	uint8_t uuid[XCL_UUID_SZ];
 	uint64_t mig_calib;
 	uint64_t data_retention;
+	uint64_t load_sched;
 };
 
 /**
