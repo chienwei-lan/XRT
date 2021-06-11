@@ -465,15 +465,14 @@ static void collect_cu_info(struct xocl_dev *xdev, struct ert_packet *ecmd)
 
 		userpf_err(xdev, "cu_info %llx\n", cu_info);
 
-
-		userpf_err(xdev, "ecu_info->cuidx %d ecu_info->nums_arg %d ecu_info->offset %d ecu_info->size %d ecu_info->dir %d \n",
-			ecu_info->cuidx, ecu_info->nums_arg, ecu_info->offset, ecu_info->size, ecu_info->dir);
-
 		ecu_info->cuidx = i;
 		ecu_info->nums_arg = cu_info->num_args;
 		ecu_info->offset = cu_info->args[0].offset;
 		ecu_info->size = cu_info->args[0].size;
 		ecu_info->dir = cu_info->args[0].dir;
+
+		userpf_err(xdev, "ecu_info->cuidx %d ecu_info->nums_arg %d ecu_info->offset %d ecu_info->size %d ecu_info->dir %d \n",
+			ecu_info->cuidx, ecu_info->nums_arg, ecu_info->offset, ecu_info->size, ecu_info->dir);
 
 	}
 }
