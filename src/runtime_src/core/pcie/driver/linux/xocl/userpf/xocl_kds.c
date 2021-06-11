@@ -463,6 +463,9 @@ static void collect_cu_info(struct xocl_dev *xdev, struct ert_packet *ecmd)
 		if (!cu_info)
 			continue;
 
+		userpf_err(xdev, "cu_info %llx\n", cu_info);
+
+
 		userpf_err(xdev, "ecu_info->cuidx %d ecu_info->nums_arg %d ecu_info->offset %d ecu_info->size %d ecu_info->dir %d \n",
 			ecu_info->cuidx, ecu_info->nums_arg, ecu_info->offset, ecu_info->size, ecu_info->dir);
 
