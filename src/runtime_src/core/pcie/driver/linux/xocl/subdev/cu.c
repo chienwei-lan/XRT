@@ -230,12 +230,13 @@ static int cu_get_info(struct platform_device *pdev, struct xrt_cu_info **cu_inf
 	if (!xcu)
 		return -EINVAL;
 
-
-	XCU_ERR(xcu, "xcu->base.info.num_args %d, xcu->base.info.args %llx",
+	XCU_ERR(xcu, "xcu->base.info.num_args %d, xcu->base.info.args %llx\n",
 		 xcu->base.info.num_args, xcu->base.info.args);
 
+	XCU_ERR(xcu, "&(xcu->base.info) %llx\n",
+		 &(xcu->base.info));
 
-	*cu_info = &xcu->base.info;
+	*cu_info = &(xcu->base.info);
 
 	return 0;
 }
