@@ -356,6 +356,14 @@ struct ert_abort_cmd {
   };
 };
 
+
+struct ert_cu_info {
+  uint32_t cuidx;
+  uint32_t nums_arg;
+  uint32_t offset;
+  uint32_t size;
+  uint32_t dir;
+};
 /**
  * struct ert_validate_cmd: ERT BIST command format.
  *
@@ -376,6 +384,8 @@ struct ert_validate_cmd {
   uint32_t cq_write_single;
   uint32_t cu_read_single;
   uint32_t cu_write_single;
+  uint32_t num_cus;
+  struct ert_cu_info cu_info[1];
 };
 
 /**
@@ -442,6 +452,7 @@ enum ert_cmd_opcode {
   ERT_START_FA      = 12,
   ERT_CLK_CALIB     = 13,
   ERT_MB_VALIDATE   = 14,
+  ERT_CUS_TEST      = 15,
 };
 
 /**
@@ -790,7 +801,7 @@ ert_valid_opcode(struct ert_packet *pkt)
   case ERT_CLK_CALIB:
   case ERT_MB_VALIDATE:
     vcmd = to_validate_pkg(pkt);
-    valid = (vcmd->count == 5);
+    valid = (vcmd->count == 100);
     break;
   case ERT_CU_STAT: /* TODO: Rules to validate? */
   case ERT_EXIT:

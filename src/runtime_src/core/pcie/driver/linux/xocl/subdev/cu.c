@@ -222,6 +222,23 @@ static void cu_del_args(struct xocl_cu *xcu)
 	if (xcu->base.info.args)
 		vfree(xcu->base.info.args);
 }
+static int cu_get_info(struct platform_device *pdev, struct xrt_cu_info **cu_info)
+{
+	struct xocl_cu *xcu = platform_get_drvdata(pdev);
+	int err;
+
+	if (!xcu)
+		return -EINVAL;
+
+
+	*cu_info = &xcu->base.info;
+
+	return 0;
+}
+
+static struct xocl_cu_funcs cu_ops = {
+	.get_xcu_info = cu_get_info,
+};
 
 static int cu_probe(struct platform_device *pdev)
 {
@@ -407,8 +424,14 @@ static int cu_remove(struct platform_device *pdev)
 	return 0;
 }
 
+
+struct xocl_drv_private cu_priv = {
+	.ops = &cu_ops,
+	.dev = -1,
+};
+
 static struct platform_device_id cu_id_table[] = {
-	{ XOCL_DEVNAME(XOCL_CU), 0 },
+	{ XOCL_DEVNAME(XOCL_CU), (kernel_ulong_t)&cu_priv },
 	{ },
 };
 

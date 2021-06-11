@@ -447,6 +447,34 @@ static bool copy_and_validate_execbuf(struct xocl_dev *xdev,
 	return true;
 }
 
+static void collect_cu_info(struct xocl_dev *xdev, struct ert_packet *ecmd)
+{
+	struct kds_sched *kds = &XDEV(xdev)->kds;
+	int num_cu = kds_get_cu_total(kds), i = 0;
+	struct ert_validate_cmd *cmd = (struct ert_validate_cmd *)ecmd;
+
+	cmd->num_cus = num_cu;
+
+	for (; i < num_cu; ++i ) {
+		struct ert_cu_info *ecu_info = &cmd->cu_info[i];
+		struct xrt_cu_info *cu_info = NULL;
+
+		xocl_cu_get_xcu_info(xdev, i, &cu_info);
+		if (!cu_info)
+			continue;
+
+		userpf_err(xdev, "ecu_info->cuidx %d ecu_info->nums_arg %d ecu_info->offset %d ecu_info->size %d ecu_info->dir %d \n",
+			ecu_info->cuidx, ecu_info->nums_arg, ecu_info->offset, ecu_info->size, ecu_info->dir);
+
+		ecu_info->cuidx = i;
+		ecu_info->nums_arg = cu_info->num_args;
+		ecu_info->offset = cu_info->args[0].offset;
+		ecu_info->size = cu_info->args[0].size;
+		ecu_info->dir = cu_info->args[0].dir;
+
+	}
+}
+
 static int xocl_command_ioctl(struct xocl_dev *xdev, void *data,
 			      struct drm_file *filp, bool in_kernel)
 {
@@ -582,6 +610,7 @@ static int xocl_command_ioctl(struct xocl_dev *xdev, void *data,
 		break;
 	case ERT_MB_VALIDATE:
 		xcmd->opcode = OP_VALIDATE;
+		collect_cu_info(xdev, ecmd);
 		break;
 	case ERT_CU_STAT:
 		xcmd->opcode = OP_GET_STAT;

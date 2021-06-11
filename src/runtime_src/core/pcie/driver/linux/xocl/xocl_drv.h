@@ -1715,6 +1715,7 @@ struct calib_storage_funcs {
 struct xocl_cu_funcs {
 	struct xocl_subdev_funcs common_funcs;
 	int (*submit)(struct platform_device *pdev, struct kds_command *xcmd);
+	int (*get_xcu_info)(struct platform_device *pdev, struct xrt_cu_info **cu_info);
 };
 #define CU_DEV(xdev, idx) \
 	SUBDEV_MULTI(xdev, XOCL_SUBDEV_CU, idx).pldev
@@ -1722,6 +1723,12 @@ struct xocl_cu_funcs {
 	((struct xocl_cu_funcs *)SUBDEV_MULTI(xdev, XOCL_SUBDEV_CU, idx).ops)
 #define CU_CB(xdev, idx, cb) \
 	(CU_DEV(xdev, idx) && CU_OPS(xdev, idx) && CU_OPS(xdev, idx)->cb)
+#define xocl_cu_get_xcu_info(xdev, idx, cu_info)				\
+	(CU_CB(xdev, idx, get_xcu_info) ?						\
+	CU_OPS(xdev, idx)->get_xcu_info(CU_DEV(xdev, idx), cu_info) : \
+	-ENODEV)
+
+
 
 /* INTC call back */
 enum intc_mode {
