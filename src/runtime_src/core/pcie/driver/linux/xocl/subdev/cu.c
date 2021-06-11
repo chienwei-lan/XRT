@@ -214,6 +214,9 @@ static int cu_add_args(struct xocl_cu *xcu, struct kernel_info *kinfo)
 		xcu->base.info.args = args;
 	}
 
+		XCU_WARN(xcu, "xcu->base.info.num_args %d, xcu->base.info.args %llx",
+			 xcu->base.info.num_args, xcu->base.info.args);
+
 	return 0;
 }
 
@@ -229,6 +232,8 @@ static int cu_get_info(struct platform_device *pdev, struct xrt_cu_info **cu_inf
 
 	if (!xcu)
 		return -EINVAL;
+
+	xcu->base.info;
 
 
 	*cu_info = &xcu->base.info;
