@@ -1800,6 +1800,7 @@ static int (*xocl_drv_reg_funcs[])(void) __initdata = {
 	xocl_init_msix_xdma,
 	xocl_init_ert_user,
 	xocl_init_m2m,
+	xocl_init_add,
 };
 
 static void (*xocl_drv_unreg_funcs[])(void) = {
@@ -1839,6 +1840,7 @@ static void (*xocl_drv_unreg_funcs[])(void) = {
 	xocl_fini_m2m,
 	/* Remove intc sub-device after CU/ERT sub-devices */
 	xocl_fini_intc,
+	xocl_fini_add,
 };
 
 static int __init xocl_init(void)

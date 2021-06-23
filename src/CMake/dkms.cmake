@@ -229,6 +229,7 @@ SET (XRT_DKMS_DRIVER_SRCS
   xocl/subdev/trace_s2mm.c
   xocl/subdev/spc.c
   xocl/subdev/lapc.c
+  xocl/subdev/add.c
   xocl/subdev/memory_hbm.c
   xocl/subdev/ddr_srsr.c
   xocl/subdev/ulite.c

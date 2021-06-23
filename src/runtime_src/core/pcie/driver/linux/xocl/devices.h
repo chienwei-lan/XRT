@@ -264,6 +264,7 @@ enum {
 #define	XOCL_ERT_USER		"ert_user"
 #define	XOCL_M2M		"m2m"
 #define	XOCL_PCIE_FIREWALL	"pcie_firewall"
+#define	XOCL_ADD		"deadlock_detector"
 
 #define XOCL_DEVNAME(str)	str SUBDEV_SUFFIX
 
@@ -316,6 +317,7 @@ enum subdev_id {
 	XOCL_SUBDEV_ICAP_CNTRL,
 	XOCL_SUBDEV_ERT_USER,
 	XOCL_SUBDEV_ERT_VERSAL,
+	XOCL_SUBDEV_ADD,
 	XOCL_SUBDEV_NUM
 };
 
@@ -834,6 +836,27 @@ struct xocl_subdev_map {
 		XOCL_TRACE_S2MM,				\
 		XOCL_RES_TRACE_S2MM,			\
 		ARRAY_SIZE(XOCL_RES_TRACE_S2MM),		\
+		.level = XOCL_SUBDEV_LEVEL_URP,		\
+		.multi_inst = true,			\
+		.override_idx = -1,			\
+	}
+
+#define	XOCL_RES_ADD			\
+	((struct resource []) {				\
+		{					\
+			.name   = "ACCEL_DLK_DTR",	\
+			.start	= 0x0,			\
+			.end	= 0xFFF,		\
+			.flags  = IORESOURCE_MEM,	\
+		},					\
+	})
+
+#define	XOCL_DEVINFO_ADD				\
+	{						\
+		XOCL_SUBDEV_ADD,			\
+		XOCL_ADD,				\
+		XOCL_RES_ADD,			\
+		ARRAY_SIZE(XOCL_RES_ADD),		\
 		.level = XOCL_SUBDEV_LEVEL_URP,		\
 		.multi_inst = true,			\
 		.override_idx = -1,			\
