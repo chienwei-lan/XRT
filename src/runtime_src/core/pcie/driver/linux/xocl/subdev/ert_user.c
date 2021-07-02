@@ -147,7 +147,7 @@ struct xrt_ert {
 static ssize_t clock_timestamp_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 
 	return sprintf(buf, "%u\n", ert_user->ert_valid.timestamp);
 }
@@ -157,7 +157,7 @@ static DEVICE_ATTR_RO(clock_timestamp);
 static ssize_t snap_shot_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 
 	return sprintf(buf, "pq:%d pq_ctrl:%d,  rq:%d, rq_ctrl:%d, sq:%d cq:%d\n", ert_user->pq.num, ert_user->pq_ctrl.num, ert_user->rq.num
 		,ert_user->rq_ctrl.num, ert_user->sq.num, ert_user->cq.num);
@@ -168,7 +168,7 @@ static DEVICE_ATTR_RO(snap_shot);
 static ssize_t ert_dmsg_store(struct device *dev,
 	struct device_attribute *da, const char *buf, size_t count)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 	u32 val;
 
 	mutex_lock(&ert_user->lock);
@@ -188,7 +188,7 @@ static DEVICE_ATTR_WO(ert_dmsg);
 static ssize_t ert_echo_store(struct device *dev,
 	struct device_attribute *da, const char *buf, size_t count)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 	u32 val;
 
 	mutex_lock(&ert_user->lock);
@@ -208,7 +208,7 @@ static DEVICE_ATTR_WO(ert_echo);
 static ssize_t ert_intr_store(struct device *dev,
 	struct device_attribute *da, const char *buf, size_t count)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 	u32 val;
 
 	mutex_lock(&ert_user->lock);
@@ -260,7 +260,7 @@ static DEVICE_ATTR_RW(mb_sleep);
 static ssize_t cq_read_cnt_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 
 	return sprintf(buf, "%d\n", ert_user->ert_valid.cq_read_single);
 }
@@ -270,7 +270,7 @@ static DEVICE_ATTR_RO(cq_read_cnt);
 static ssize_t cq_write_cnt_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 
 	return sprintf(buf, "%d\n", ert_user->ert_valid.cq_write_single);
 }
@@ -280,7 +280,7 @@ static DEVICE_ATTR_RO(cq_write_cnt);
 static ssize_t cu_read_cnt_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 
 	return sprintf(buf, "%d\n", ert_user->ert_valid.cu_read_single);
 }
@@ -290,7 +290,7 @@ static DEVICE_ATTR_RO(cu_read_cnt);
 static ssize_t cu_write_cnt_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	struct xrt_ert *ert_user = platform_get_drvdata(to_platform_device(dev));
 
 	return sprintf(buf, "%d\n", ert_user->ert_valid.cu_write_single);
 }
@@ -343,7 +343,7 @@ static int ert_user_enable(struct platform_device *pdev, bool enable)
 	return ret;
 }
 
-static struct xocl_ert_user_funcs ert_user_ops = {
+static struct xrt_ert_funcs ert_user_ops = {
 	.bulletin = ert_user_bulletin,
 	.enable = ert_user_enable,
 };
@@ -1057,9 +1057,11 @@ static int ert_user_remove(struct platform_device *pdev)
 	xocl_drvinst_release(ert_user, &hdl);
 
 	ert_intc_enable(ert_user, false);
-#if 0
+
+	ert_user->stop = 1;
 	up(&ert_user->sem);
-#endif
+	(void) kthread_stop(ert_user->thread);
+
 	platform_set_drvdata(pdev, NULL);
 
 	xocl_drvinst_free(hdl);
@@ -1075,7 +1077,6 @@ static int ert_user_probe(struct platform_device *pdev)
 	xdev_handle_t xdev = xocl_get_xdev(pdev);
 	struct xocl_ert_sched_privdata *priv = NULL;
 	bool ert = xocl_ert_on(xdev);
-	bool queue_exist = false;
 
 	/* If XOCL_DSAFLAG_MB_SCHE_OFF is set, we should not probe ert */
 	if (!ert) {
@@ -1089,10 +1090,34 @@ static int ert_user_probe(struct platform_device *pdev)
 
 	ert_user->dev = &pdev->dev;
 	ert_user->pdev = pdev;
+	/* Initialize pending queue and lock */
+	INIT_LIST_HEAD(&ert_user->pq.head);
+	INIT_LIST_HEAD(&ert_user->pq_ctrl.head);
+	spin_lock_init(&ert_user->pq_lock);
+	/* Initialize run queue */
+	INIT_LIST_HEAD(&ert_user->rq.head);
+	INIT_LIST_HEAD(&ert_user->rq_ctrl.head);
 
+	/* Initialize completed queue */
+	INIT_LIST_HEAD(&ert_user->cq.head);
+	INIT_LIST_HEAD(&ert_user->sq.head);
+
+	mutex_init(&ert_user->ev_lock);
+	INIT_LIST_HEAD(&ert_user->events);
+
+	sema_init(&ert_user->sem, 0);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+	setup_timer(&ert_user->timer, ert_timer, (unsigned long)ert_user);
+#else
+	timer_setup(&ert_user->timer, ert_timer, 0);
+#endif
+	atomic_set(&ert_user->tick, 0);
+
+	ert_user->thread = kthread_run(ert_user_thread, ert_user, "ert_thread");
 
 	platform_set_drvdata(pdev, ert_user);
-
+	mutex_init(&ert_user->lock);
 
 	if (XOCL_GET_SUBDEV_PRIV(&pdev->dev)) {
 		priv = XOCL_GET_SUBDEV_PRIV(&pdev->dev);
@@ -1101,30 +1126,21 @@ static int ert_user_probe(struct platform_device *pdev)
 		xocl_err(&pdev->dev, "did not get private data");
 	}
 
+
 	err = sysfs_create_group(&pdev->dev.kobj, &ert_user_attr_group);
 	if (err) {
 		xocl_err(&pdev->dev, "create ert_user sysfs attrs failed: %d", err);
 		goto done;
 	}
-
-	//xrt_ert_init(&ert_user->ert, (void *)ert_user);
-
-	//xrt_ert_queue_func_register(&ert_user->ert, &xrt_ert_func);
-
-	if (!queue_exist){
-		ert = -ENODEV;
-		goto done;
-	}
-
-	// hack, xrt_ert should in change to register itself
-	//BUG_ON(!&ert_user->ert.ert.submit);
+	ert_user->ert.submit = ert_user_submit;
+	ert_user->ert.abort = xrt_ert_abort;
+	ert_user->ert.abort_done = xrt_ert_abort_done;
 	xocl_kds_init_ert(xdev, &ert_user->ert);
 
 	/* Enable interrupt by default */
 	ert_user->num_slots = 128;
 	ert_user->polling_mode = false;
 	ert_intc_enable(ert_user, true);
-
 done:
 	if (err) {
 		ert_user_remove(pdev);
