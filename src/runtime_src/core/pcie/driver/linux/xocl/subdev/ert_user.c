@@ -141,6 +141,7 @@ struct xrt_ert {
 	uint32_t		intr;
 	void 			*queue_core;
 	struct xrt_ert_queue_funcs    *func;
+	struct ert_validate_cmd ert_valid;
 };
 
 static ssize_t clock_timestamp_show(struct device *dev,
@@ -235,12 +236,12 @@ static ssize_t mb_sleep_store(struct device *dev,
 			"usage: echo 0 or 1 > mb_sleep");
 		return -EINVAL;
 	}
-
+#if 0
 	if (go_sleep)
 		ert_user_gpio_cfg(pdev, MB_SLEEP);
 	else
 		ert_user_gpio_cfg(pdev, MB_WAKEUP);
-
+#endif
 	return count;
 }
 
@@ -249,7 +250,9 @@ static ssize_t mb_sleep_show(struct device *dev,
 {
 	struct platform_device *pdev = to_platform_device(dev);
 
-	return sprintf(buf, "%d", ert_user_gpio_cfg(pdev, MB_STATUS));
+///	return sprintf(buf, "%d", ert_user_gpio_cfg(pdev, MB_STATUS));
+
+	return 0;
 }
 
 static DEVICE_ATTR_RW(mb_sleep);
@@ -1114,8 +1117,8 @@ static int ert_user_probe(struct platform_device *pdev)
 	}
 
 	// hack, xrt_ert should in change to register itself
-	BUG_ON(!&ert_user->ert.ert.submit);
-	xocl_kds_init_ert(xdev, &ert_user->ert.ert);
+	//BUG_ON(!&ert_user->ert.ert.submit);
+	xocl_kds_init_ert(xdev, &ert_user->ert);
 
 	/* Enable interrupt by default */
 	ert_user->num_slots = 128;
