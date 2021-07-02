@@ -91,6 +91,7 @@ xocl-y := \
 	../subdev/msix_xdma.o \
 	../subdev/ert_user.o \
 	../subdev/add.o \
+	../subdev/command_queue.o \
 	$(xocl_lib-y)	\
 	$(drv_common-y) \
 	xocl_drv.o	\
