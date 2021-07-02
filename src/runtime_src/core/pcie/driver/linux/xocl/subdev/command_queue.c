@@ -47,23 +47,23 @@
 #define CLEAR_MB_WAKEUP		~WAKE_MB_UP
 
 #ifdef SCHED_VERBOSE
-#define	ERTUSER_ERR(ert_user, fmt, arg...)	\
-	xocl_err(ert_user->dev, fmt "", ##arg)
-#define	ERTUSER_WARN(ert_user, fmt, arg...)	\
-	xocl_warn(ert_user->dev, fmt "", ##arg)	
-#define	ERTUSER_INFO(ert_user, fmt, arg...)	\
-	xocl_info(ert_user->dev, fmt "", ##arg)	
-#define	ERTUSER_DBG(ert_user, fmt, arg...)	\
-	xocl_info(ert_user->dev, fmt "", ##arg)
+#define	ERTUSER_ERR(cmd_queue, fmt, arg...)	\
+	xocl_err(cmd_queue->dev, fmt "", ##arg)
+#define	ERTUSER_WARN(cmd_queue, fmt, arg...)	\
+	xocl_warn(cmd_queue->dev, fmt "", ##arg)	
+#define	ERTUSER_INFO(cmd_queue, fmt, arg...)	\
+	xocl_info(cmd_queue->dev, fmt "", ##arg)	
+#define	ERTUSER_DBG(cmd_queue, fmt, arg...)	\
+	xocl_info(cmd_queue->dev, fmt "", ##arg)
 
 #else
-#define	ERTUSER_ERR(ert_user, fmt, arg...)	\
-	xocl_err(ert_user->dev, fmt "", ##arg)
-#define	ERTUSER_WARN(ert_user, fmt, arg...)	\
-	xocl_warn(ert_user->dev, fmt "", ##arg)	
-#define	ERTUSER_INFO(ert_user, fmt, arg...)	\
-	xocl_info(ert_user->dev, fmt "", ##arg)	
-#define	ERTUSER_DBG(ert_user, fmt, arg...)
+#define	ERTUSER_ERR(cmd_queue, fmt, arg...)	\
+	xocl_err(cmd_queue->dev, fmt "", ##arg)
+#define	ERTUSER_WARN(cmd_queue, fmt, arg...)	\
+	xocl_warn(cmd_queue->dev, fmt "", ##arg)	
+#define	ERTUSER_INFO(cmd_queue, fmt, arg...)	\
+	xocl_info(cmd_queue->dev, fmt "", ##arg)	
+#define	ERTUSER_DBG(cmd_queue, fmt, arg...)
 #endif
 
 
@@ -99,239 +99,14 @@ struct command_queue {
 	uint32_t 		ert_dmsg;
 	uint32_t		echo;
 	uint32_t		intr;
-	struct xrt_ert 		ert;
+	void  			*ert_core;
 	struct ert_validate_cmd ert_valid;
 };
 
 static void command_queue_submit(struct xrt_ert_command *ecmd, void *data);
-static int32_t ert_user_gpio_cfg(struct platform_device *pdev, enum ert_gpio_cfg type);
 
-static void ert_intc_enable(struct command_queue *ert_user, bool enable);
+static void ert_intc_enable(struct command_queue *cmd_queue, bool enable);
 
-static ssize_t clock_timestamp_show(struct device *dev,
-			   struct device_attribute *attr, char *buf)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-
-	return sprintf(buf, "%u\n", ert_user->ert_valid.timestamp);
-}
-
-static DEVICE_ATTR_RO(clock_timestamp);
-
-static ssize_t snap_shot_show(struct device *dev,
-			   struct device_attribute *attr, char *buf)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-	struct xrt_ert *ert = &ert_user->ert;
-
-	return sprintf(buf, "pq:%d pq_ctrl:%d,  rq:%d, rq_ctrl:%d, sq:%d cq:%d\n", ert->pq.num, ert->pq_ctrl.num, ert->rq.num
-		,ert->rq_ctrl.num, ert->sq.num, ert->cq.num);
-}
-
-static DEVICE_ATTR_RO(snap_shot);
-
-static ssize_t ert_dmsg_store(struct device *dev,
-	struct device_attribute *da, const char *buf, size_t count)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-	u32 val;
-
-	mutex_lock(&ert_user->lock);
-	if (kstrtou32(buf, 10, &val) == -EINVAL || val > 2) {
-		xocl_err(&to_platform_device(dev)->dev,
-			"usage: echo 0 or 1 > ert_dmsg");
-		return -EINVAL;
-	}
-
-	ert_user->ert_dmsg = val;
-
-	mutex_unlock(&ert_user->lock);
-	return count;
-}
-static DEVICE_ATTR_WO(ert_dmsg);
-
-static ssize_t ert_echo_store(struct device *dev,
-	struct device_attribute *da, const char *buf, size_t count)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-	u32 val;
-
-	mutex_lock(&ert_user->lock);
-	if (kstrtou32(buf, 10, &val) == -EINVAL || val > 2) {
-		xocl_err(&to_platform_device(dev)->dev,
-			"usage: echo 0 or 1 > ert_echo");
-		return -EINVAL;
-	}
-
-	ert_user->echo = val;
-
-	mutex_unlock(&ert_user->lock);
-	return count;
-}
-static DEVICE_ATTR_WO(ert_echo);
-
-static ssize_t ert_intr_store(struct device *dev,
-	struct device_attribute *da, const char *buf, size_t count)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-	u32 val;
-
-	mutex_lock(&ert_user->lock);
-	if (kstrtou32(buf, 10, &val) == -EINVAL || val > 2) {
-		xocl_err(&to_platform_device(dev)->dev,
-			"usage: echo 0 or 1 > ert_intr");
-		return -EINVAL;
-	}
-
-	ert_user->intr = val;
-
-	mutex_unlock(&ert_user->lock);
-	return count;
-}
-static DEVICE_ATTR_WO(ert_intr);
-
-static ssize_t mb_sleep_store(struct device *dev,
-	struct device_attribute *da, const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	u32 go_sleep;
-
-	if (kstrtou32(buf, 10, &go_sleep) == -EINVAL || go_sleep > 2) {
-		xocl_err(&to_platform_device(dev)->dev,
-			"usage: echo 0 or 1 > mb_sleep");
-		return -EINVAL;
-	}
-
-	if (go_sleep)
-		ert_user_gpio_cfg(pdev, MB_SLEEP);
-	else
-		ert_user_gpio_cfg(pdev, MB_WAKEUP);
-
-	return count;
-}
-
-static ssize_t mb_sleep_show(struct device *dev,
-			   struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-
-	return sprintf(buf, "%d", ert_user_gpio_cfg(pdev, MB_STATUS));
-}
-
-static DEVICE_ATTR_RW(mb_sleep);
-
-static ssize_t cq_read_cnt_show(struct device *dev,
-			   struct device_attribute *attr, char *buf)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-
-	return sprintf(buf, "%d\n", ert_user->ert_valid.cq_read_single);
-}
-
-static DEVICE_ATTR_RO(cq_read_cnt);
-
-static ssize_t cq_write_cnt_show(struct device *dev,
-			   struct device_attribute *attr, char *buf)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-
-	return sprintf(buf, "%d\n", ert_user->ert_valid.cq_write_single);
-}
-
-static DEVICE_ATTR_RO(cq_write_cnt);
-
-static ssize_t cu_read_cnt_show(struct device *dev,
-			   struct device_attribute *attr, char *buf)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-
-	return sprintf(buf, "%d\n", ert_user->ert_valid.cu_read_single);
-}
-
-static DEVICE_ATTR_RO(cu_read_cnt);
-
-static ssize_t cu_write_cnt_show(struct device *dev,
-			   struct device_attribute *attr, char *buf)
-{
-	struct command_queue *ert_user = platform_get_drvdata(to_platform_device(dev));
-
-	return sprintf(buf, "%d\n", ert_user->ert_valid.cu_write_single);
-}
-
-static DEVICE_ATTR_RO(cu_write_cnt);
-
-static struct attribute *ert_user_attrs[] = {
-	&dev_attr_clock_timestamp.attr,
-	&dev_attr_ert_dmsg.attr,
-	&dev_attr_snap_shot.attr,
-	&dev_attr_ert_echo.attr,
-	&dev_attr_ert_intr.attr,
-	&dev_attr_mb_sleep.attr,
-	&dev_attr_cq_read_cnt.attr,
-	&dev_attr_cq_write_cnt.attr,
-	&dev_attr_cu_read_cnt.attr,
-	&dev_attr_cu_write_cnt.attr,
-	NULL,
-};
-
-static struct attribute_group ert_user_attr_group = {
-	.attrs = ert_user_attrs,
-};
-
-
-static int32_t ert_user_gpio_cfg(struct platform_device *pdev, enum ert_gpio_cfg type)
-{
-	struct command_queue *ert_user = platform_get_drvdata(pdev);
-	xdev_handle_t xdev = xocl_get_xdev(ert_user->pdev);
-	int32_t ret = 0, val = 0;
-	int i;
-
-	if (!ert_user->cfg_gpio) {
-		ERTUSER_WARN(ert_user, "%s ERT config gpio not found\n", __func__);
-		return -ENODEV;
-	}
-	mutex_lock(&ert_user->lock);
-	val = ioread32(ert_user->cfg_gpio);
-
-	switch (type) {
-	case INTR_TO_ERT:
-		val &= SWITCH_TO_ERT_INTR;
-		iowrite32(val, ert_user->cfg_gpio+GPIO_CFG_CTRL_CHANNEL);
-		for (i = 0; i < ert_user->num_slots; i++)
-			xocl_intc_ert_config(xdev, i, true);
-		/* TODO: This could return error code -EBUSY. */
-		xocl_intc_set_mode(xocl_get_xdev(pdev), ERT_INTR);
-		break;
-	case INTR_TO_CU:
-		val |= SWITCH_TO_CU_INTR;
-		iowrite32(val, ert_user->cfg_gpio+GPIO_CFG_CTRL_CHANNEL);
-		for (i = 0; i < ert_user->num_slots; i++)
-			xocl_intc_ert_config(xdev, i, false);
-		/* TODO: This could return error code -EBUSY. */
-		xocl_intc_set_mode(xocl_get_xdev(pdev), CU_INTR);
-		break;
-	case MB_WAKEUP:
-		val |= WAKE_MB_UP;
-		iowrite32(val, ert_user->cfg_gpio+GPIO_CFG_CTRL_CHANNEL);
-		break;
-	case MB_SLEEP:
-		val &= CLEAR_MB_WAKEUP;
-		iowrite32(val, ert_user->cfg_gpio+GPIO_CFG_CTRL_CHANNEL);
-		/* TODO: submit an EXIT command to ERT thread */
-		iowrite32(ERT_EXIT_CMD, ert_user->cq_base);
-		ret = ioread32(ert_user->cfg_gpio+GPIO_CFG_STA_CHANNEL);
-		while (!ret)
-			ret = ioread32(ert_user->cfg_gpio+GPIO_CFG_STA_CHANNEL);
-		break;
-	case MB_STATUS:
-		ret = ioread32(ert_user->cfg_gpio+GPIO_CFG_STA_CHANNEL);
-		break;
-	default:
-		break;
-	}
-	mutex_unlock(&ert_user->lock);
-	return ret;
-}
 
 /*
  * type() - Command type
@@ -368,32 +143,32 @@ idx_in_mask32(unsigned int idx, unsigned int mask_idx)
 	return idx - (mask_idx << 5);
 }
 #if 0
-static int ert_user_bulletin(struct platform_device *pdev, struct ert_cu_bulletin *brd)
+static int cmd_queue_bulletin(struct platform_device *pdev, struct ert_cu_bulletin *brd)
 {
-	struct command_queue *ert_user = platform_get_drvdata(pdev);
+	struct command_queue *cmd_queue = platform_get_drvdata(pdev);
 	int ret = 0;
 
 	if (!brd)
 		return -EINVAL;
 
-	brd->sta.configured = ert_user->is_configured;
-	brd->cap.cu_intr = ert_user->cfg_gpio ? 1 : 0;
+	brd->sta.configured = cmd_queue->is_configured;
+	brd->cap.cu_intr = cmd_queue->cfg_gpio ? 1 : 0;
 
 	return ret;
 }
 #endif
 
 #if 0
-static int ert_user_enable(struct platform_device *pdev, bool enable)
+static int cmd_queue_enable(struct platform_device *pdev, bool enable)
 {
 	int ret = 0;
 
 	if (enable) {
-		ert_user_gpio_cfg(pdev, MB_WAKEUP);
-		ert_user_gpio_cfg(pdev, INTR_TO_ERT);
+		cmd_queue_gpio_cfg(pdev, MB_WAKEUP);
+		cmd_queue_gpio_cfg(pdev, INTR_TO_ERT);
 	} else {
-		ert_user_gpio_cfg(pdev, MB_SLEEP);
-		ert_user_gpio_cfg(pdev, INTR_TO_CU);
+		cmd_queue_gpio_cfg(pdev, MB_SLEEP);
+		cmd_queue_gpio_cfg(pdev, INTR_TO_CU);
 	}
 
 	return ret;
@@ -401,8 +176,8 @@ static int ert_user_enable(struct platform_device *pdev, bool enable)
 #endif
 static void command_queue_submit(struct xrt_ert_command* ecmd, void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
-	xdev_handle_t xdev = xocl_get_xdev(ert_user->pdev);
+	struct command_queue *cmd_queue = (struct command_queue *)core;
+	xdev_handle_t xdev = xocl_get_xdev(cmd_queue->pdev);
 	u32 slot_addr;
 	u32 mask_idx, cq_int_addr, mask;
 	struct ert_packet *epkt = NULL;
@@ -411,8 +186,8 @@ static void command_queue_submit(struct xrt_ert_command* ecmd, void *core)
 
 	epkt = (struct ert_packet *)ecmd->xcmd->execbuf;
 
-	slot_addr = ecmd->handle * ert_user->slot_size;
-	ert_user->submit_queue[ecmd->handle] = ecmd;
+	slot_addr = ecmd->handle * cmd_queue->slot_size;
+	cmd_queue->submit_queue[ecmd->handle] = ecmd;
 
 	if (kds_echo) {
 		ecmd->completed = true;
@@ -420,17 +195,17 @@ static void command_queue_submit(struct xrt_ert_command* ecmd, void *core)
 
 		if (cmd_opcode(ecmd) == OP_START) {
 			// write kds selected cu_idx in first cumask (first word after header)
-			iowrite32(ecmd->xcmd->cu_idx, ert_user->cq_base + slot_addr + 4);
+			iowrite32(ecmd->xcmd->cu_idx, cmd_queue->cq_base + slot_addr + 4);
 
 			// write remaining packet (past header and cuidx)
-			xocl_memcpy_toio(ert_user->cq_base + slot_addr + 8,
+			xocl_memcpy_toio(cmd_queue->cq_base + slot_addr + 8,
 					 ecmd->xcmd->execbuf+2, (epkt->count-1)*sizeof(u32));
 		} else {
-			xocl_memcpy_toio(ert_user->cq_base + slot_addr + 4,
+			xocl_memcpy_toio(cmd_queue->cq_base + slot_addr + 4,
 				  ecmd->xcmd->execbuf+1, epkt->count*sizeof(u32));
 		}
 
-		iowrite32(epkt->header, ert_user->cq_base + slot_addr);
+		iowrite32(epkt->header, cmd_queue->cq_base + slot_addr);
 	}
 #if 0
 	should be moved to common layer
@@ -453,23 +228,17 @@ static void command_queue_submit(struct xrt_ert_command* ecmd, void *core)
 	cq_int_addr = CQ_STATUS_OFFSET + (mask_idx << 2);
 	mask = 1 << idx_in_mask32(ecmd->handle, mask_idx);
 
-	ERTUSER_DBG(ert_user, "++ mb_submit writes slot mask 0x%x to CQ_INT register at addr 0x%x\n",
+	ERTUSER_DBG(cmd_queue, "++ mb_submit writes slot mask 0x%x to CQ_INT register at addr 0x%x\n",
 		    mask, cq_int_addr);
 	xocl_intc_ert_write32(xdev, mask, cq_int_addr);
 
 }
-#if 0
-static struct xocl_command_queue_funcs ert_user_ops = {
-	.bulletin = ert_user_bulletin,
-	.enable = ert_user_enable,
-};
-#endif
 
 static const unsigned int no_index = -1;
-static void ert_user_reset(struct command_queue *ert_user)
+static void cmd_queue_reset(struct command_queue *cmd_queue)
 {
-	bitmap_zero(ert_user->slot_status, ERT_MAX_SLOTS);
-	set_bit(0, ert_user->slot_status);
+	bitmap_zero(cmd_queue->slot_status, ERT_MAX_SLOTS);
+	set_bit(0, cmd_queue->slot_status);
 }
 
 static inline int
@@ -508,10 +277,10 @@ ert_return_size(struct xrt_ert_command *ecmd, int max_size)
  * But truncate is definitly not ideal, this should be fixed in new KDS.
  */
 static inline void
-ert_get_return(struct command_queue *ert_user, struct xrt_ert_command *ecmd)
+ert_get_return(struct command_queue *cmd_queue, struct xrt_ert_command *ecmd)
 {
 	u32 slot_addr;
-	int slot_size = ert_user->slot_size;
+	int slot_size = cmd_queue->slot_size;
 	int size;
 	void *dst = NULL;
 
@@ -524,7 +293,7 @@ ert_get_return(struct command_queue *ert_user, struct xrt_ert_command *ecmd)
 	switch (cmd_opcode(ecmd)) {
 	case OP_VALIDATE:
 	case OP_CLK_CALIB:
-		dst = &ert_user->ert_valid;
+		dst = &cmd_queue->ert_valid;
 		break;
 	default:
 		dst = ecmd->xcmd->u_execbuf;
@@ -532,7 +301,7 @@ ert_get_return(struct command_queue *ert_user, struct xrt_ert_command *ecmd)
 	}
 
 	if (size && dst)
-		xocl_memcpy_fromio(dst, ert_user->cq_base + slot_addr, size);
+		xocl_memcpy_fromio(dst, cmd_queue->cq_base + slot_addr, size);
 }
 
 static inline bool ert_special_cmd(struct xrt_ert_command *ecmd)
@@ -557,9 +326,9 @@ static inline bool ert_special_cmd(struct xrt_ert_command *ecmd)
  * release_slot_idx() - Release specified slot idx
  */
 static void
-ert_release_slot_idx(struct command_queue *ert_user, unsigned int slot_idx)
+ert_release_slot_idx(struct command_queue *cmd_queue, unsigned int slot_idx)
 {
-	clear_bit(slot_idx, ert_user->slot_status);
+	clear_bit(slot_idx, cmd_queue->slot_status);
 }
 
 /**
@@ -571,15 +340,15 @@ ert_release_slot_idx(struct command_queue *ert_user, unsigned int slot_idx)
 static void
 command_queue_release(struct xrt_ert_command *ecmd, void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
+	struct command_queue *cmd_queue = (struct command_queue *)core;
 
 	if (ecmd->handle == no_index)
 		return;
 
 	/* special command always uses slot 0, don't reset bit0*/
 	if (!ert_special_cmd(ecmd)) {
-		ERTUSER_DBG(ert_user, "ecmd->handle %d\n", ecmd->handle);
-		ert_release_slot_idx(ert_user, ecmd->handle);
+		ERTUSER_DBG(cmd_queue, "ecmd->handle %d\n", ecmd->handle);
+		ert_release_slot_idx(cmd_queue, ecmd->handle);
 	}
 	ecmd->handle = no_index;
 }
@@ -587,16 +356,16 @@ command_queue_release(struct xrt_ert_command *ecmd, void *core)
 static irqreturn_t
 ert_versal_isr(void *arg)
 {
-	struct command_queue *ert_user = (struct command_queue *)arg;
+	struct command_queue *cmd_queue = (struct command_queue *)arg;
 	xdev_handle_t xdev;
 	struct xrt_ert_command *ecmd;
 
-	BUG_ON(!ert_user);
+	BUG_ON(!cmd_queue);
 
-	ERTUSER_DBG(ert_user, "-> %s\n", __func__);
-	xdev = xocl_get_xdev(ert_user->pdev);
+	ERTUSER_DBG(cmd_queue, "-> %s\n", __func__);
+	xdev = xocl_get_xdev(cmd_queue->pdev);
 
-	if (!ert_user->polling_mode) {
+	if (!cmd_queue->polling_mode) {
 		u32 slots[ERT_MAX_SLOTS];
 		u32 cnt = 0;
 		int slot;
@@ -610,17 +379,17 @@ ert_versal_isr(void *arg)
 
 		for (i = 0; i < cnt; i++) {
 			slot = slots[i];
-			ERTUSER_DBG(ert_user, "[%s] slot: %d\n", __func__, slot);
-			ecmd = ert_user->submit_queue[slot];
+			ERTUSER_DBG(cmd_queue, "[%s] slot: %d\n", __func__, slot);
+			ecmd = cmd_queue->submit_queue[slot];
 			if (ecmd) {
 				ecmd->completed = true;
 			} else {
-				ERTUSER_ERR(ert_user, "not in submitted queue %d\n", slot);
+				ERTUSER_ERR(cmd_queue, "not in submitted queue %d\n", slot);
 			}
 		}
 
 #if 0
-		up(&ert_user->sem);
+		up(&cmd_queue->sem);
 		/* wake up all scheduler ... currently one only */
 		if (xs->stop)
 			return;
@@ -631,37 +400,37 @@ ert_versal_isr(void *arg)
 		}
 #endif
 	} else {
-		ERTUSER_DBG(ert_user, "unhandled isr \r\n");
+		ERTUSER_DBG(cmd_queue, "unhandled isr \r\n");
 		return IRQ_NONE;
 	}
-	ERTUSER_DBG(ert_user, "<- %s\n", __func__);
+	ERTUSER_DBG(cmd_queue, "<- %s\n", __func__);
 	return IRQ_HANDLED;
 }
 
 static irqreturn_t
-ert_user_isr(int irq, void *arg)
+cmd_queue_isr(int irq, void *arg)
 {
-	struct command_queue *ert_user = (struct command_queue *)arg;
+	struct command_queue *cmd_queue = (struct command_queue *)arg;
 	xdev_handle_t xdev;
 	struct xrt_ert_command *ecmd;
 
-	BUG_ON(!ert_user);
+	BUG_ON(!cmd_queue);
 
-	ERTUSER_DBG(ert_user, "-> xocl_user_event %d\n", irq);
-	xdev = xocl_get_xdev(ert_user->pdev);
+	ERTUSER_DBG(cmd_queue, "-> xocl_user_event %d\n", irq);
+	xdev = xocl_get_xdev(cmd_queue->pdev);
 
 	BUG_ON(irq>=ERT_MAX_SLOTS);
 
-	if (!ert_user->polling_mode) {
+	if (!cmd_queue->polling_mode) {
 
-		ecmd = ert_user->submit_queue[irq];
+		ecmd = cmd_queue->submit_queue[irq];
 		if (ecmd) {
 			ecmd->completed = true;
 		} else {
-			ERTUSER_ERR(ert_user, "not in submitted queue %d\n", irq);
+			ERTUSER_ERR(cmd_queue, "not in submitted queue %d\n", irq);
 		}
 #if 0
-		up(&ert_user->sem);
+		up(&cmd_queue->sem);
 		/* wake up all scheduler ... currently one only */
 
 		if (xs->stop)
@@ -673,10 +442,10 @@ ert_user_isr(int irq, void *arg)
 		}
 #endif
 	} else {
-		ERTUSER_DBG(ert_user, "unhandled isr irq %d", irq);
+		ERTUSER_DBG(cmd_queue, "unhandled isr irq %d", irq);
 		return IRQ_NONE;
 	}
-	ERTUSER_DBG(ert_user, "<- xocl_user_event %d\n", irq);
+	ERTUSER_DBG(cmd_queue, "<- xocl_user_event %d\n", irq);
 	return IRQ_HANDLED;
 }
 
@@ -684,12 +453,12 @@ ert_user_isr(int irq, void *arg)
  * acquire_slot_idx() - First available slot index
  */
 static unsigned int
-command_queue_acquire_slot_idx(struct command_queue *ert_user)
+command_queue_acquire_slot_idx(struct command_queue *cmd_queue)
 {
-	unsigned int idx = find_first_zero_bit(ert_user->slot_status, ERT_MAX_SLOTS);
+	unsigned int idx = find_first_zero_bit(cmd_queue->slot_status, ERT_MAX_SLOTS);
 
-	if (idx < ert_user->num_slots) {
-		set_bit(idx, ert_user->slot_status);
+	if (idx < cmd_queue->num_slots) {
+		set_bit(idx, cmd_queue->slot_status);
 		return idx;
 	}
 	return no_index;
@@ -704,41 +473,41 @@ command_queue_acquire_slot_idx(struct command_queue *ert_user)
 static int 
 command_queue_acquire(struct xrt_ert_command *ecmd, void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
+	struct command_queue *cmd_queue = (struct command_queue *)core;
 	// slot 0 is reserved for ctrl commands
 	if (ert_special_cmd(ecmd)) {
-		set_bit(0, ert_user->slot_status);
+		set_bit(0, cmd_queue->slot_status);
 #if 0
 		###### move this part to common layer#####
-		if (ert_user->ctrl_busy) {
-			ERTUSER_DBG(ert_user, "ctrl slot is busy\n");
+		if (cmd_queue->ctrl_busy) {
+			ERTUSER_DBG(cmd_queue, "ctrl slot is busy\n");
 			return -1;
 		}
 
 		if (cmd_opcode(ecmd) != OP_GET_STAT)
-			ert_user->ctrl_busy = true;
+			cmd_queue->ctrl_busy = true;
 #endif
 		return (ecmd->handle = 0);
 	}
 
-	return (ecmd->handle = command_queue_acquire_slot_idx(ert_user));
+	return (ecmd->handle = command_queue_acquire_slot_idx(cmd_queue));
 }
 
-static void ert_intc_enable(struct command_queue *ert_user, bool enable){
+static void ert_intc_enable(struct command_queue *cmd_queue, bool enable){
 	uint32_t i;
-	xdev_handle_t xdev = xocl_get_xdev(ert_user->pdev);
+	xdev_handle_t xdev = xocl_get_xdev(cmd_queue->pdev);
 
 	if (XOCL_DSA_IS_VERSAL(xdev)) {
 		if (enable)
-			xocl_mailbox_versal_request_intr(xdev, ert_versal_isr, ert_user);
+			xocl_mailbox_versal_request_intr(xdev, ert_versal_isr, cmd_queue);
 		else
 			xocl_mailbox_versal_free_intr(xdev);
 		return;
 	}
 
-	for (i = 0; i < ert_user->num_slots; i++) {
+	for (i = 0; i < cmd_queue->num_slots; i++) {
 		if (enable) {
-			xocl_intc_ert_request(xdev, i, ert_user_isr, ert_user);
+			xocl_intc_ert_request(xdev, i, cmd_queue_isr, cmd_queue);
 			xocl_intc_ert_config(xdev, i, true);
 		} else {
 			xocl_intc_ert_config(xdev, i, false);
@@ -750,8 +519,8 @@ static void ert_intc_enable(struct command_queue *ert_user, bool enable){
 static void
 command_queue_poll(void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
-	xdev_handle_t xdev = xocl_get_xdev(ert_user->pdev);
+	struct command_queue *cmd_queue = (struct command_queue *)core;
+	xdev_handle_t xdev = xocl_get_xdev(cmd_queue->pdev);
 	struct xrt_ert_command* ecmd = NULL;
 	u32 mask = 0;
 	u32 slot_idx = 0, section_idx = 0;
@@ -760,22 +529,22 @@ command_queue_poll(void *core)
 		mask = xocl_intc_ert_read32(xdev, (section_idx<<2));
 		if (!mask)
 			continue;
-		ERTUSER_DBG(ert_user, "mask 0x%x\n", mask);
+		ERTUSER_DBG(cmd_queue, "mask 0x%x\n", mask);
 		for ( slot_idx = 0; slot_idx < 32; mask>>=1, ++slot_idx ) {
 			u32 cmd_idx = slot_idx+(section_idx<<5);
 
 			if (!mask)
 				break;
 			if (mask & 0x1) {
-				ecmd = ert_user->submit_queue[cmd_idx];
+				ecmd = cmd_queue->submit_queue[cmd_idx];
 				if (ecmd) {
-					//ert_get_return(ert_user, ecmd);
+					//ert_get_return(cmd_queue, ecmd);
 					ecmd->completed = true;
 					ecmd->status = KDS_COMPLETED;
-					ERTUSER_DBG(ert_user, "%s -> ecmd %llx xcmd%p\n", __func__, (u64)ecmd, xcmd);
-					ert_user->submit_queue[cmd_idx] = NULL;
+					ERTUSER_DBG(cmd_queue, "%s -> ecmd %llx xcmd%p\n", __func__, (u64)ecmd, xcmd);
+					cmd_queue->submit_queue[cmd_idx] = NULL;
 				} else
-					ERTUSER_DBG(ert_user, "ERR: submit queue slot is empty\n");
+					ERTUSER_DBG(cmd_queue, "ERR: submit queue slot is empty\n");
 			}
 		}
 	}
@@ -785,48 +554,48 @@ command_queue_poll(void *core)
 static void 
 command_queue_complete(struct xrt_ert_command *ecmd, void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
+	struct command_queue *cmd_queue = (struct command_queue *)core;
 
-	ert_get_return(ert_user, ecmd);
+	ert_get_return(cmd_queue, ecmd);
 }
 
 static void
 command_queue_intc_config(bool enable, void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
+	struct command_queue *cmd_queue = (struct command_queue *)core;
 
-	ert_user->polling_mode = !enable;
+	cmd_queue->polling_mode = !enable;
 
-	ert_intc_enable(ert_user, enable);
+	ert_intc_enable(cmd_queue, enable);
 }
 
 static int
 command_queue_config(uint32_t slot_size, void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
+	struct command_queue *cmd_queue = (struct command_queue *)core;
 
 	/*  1. cfg->slot_size need to be 32-bit aligned
 	 *  2. the slot num max: 128
 	 */
 
-	ERTUSER_DBG(ert_user, "configuring scheduler cq_size(%lld)\n", ert_user->cq_range);
-	if (!ert_user->cq_range || !slot_size) {
-		ERTUSER_ERR(ert_user, "should not have zero cq_range %lld, slot_size=%d",
-			ert_user->cq_range, slot_size);
+	ERTUSER_DBG(cmd_queue, "configuring scheduler cq_size(%lld)\n", cmd_queue->cq_range);
+	if (!cmd_queue->cq_range || !slot_size) {
+		ERTUSER_ERR(cmd_queue, "should not have zero cq_range %lld, slot_size=%d",
+			cmd_queue->cq_range, slot_size);
 		return -EINVAL;
 	} else if (!IS_ALIGNED(slot_size, 4)) {
-		ERTUSER_ERR(ert_user, "slot_size should be 4 bytes aligned, slot_size=%d",
+		ERTUSER_ERR(cmd_queue, "slot_size should be 4 bytes aligned, slot_size=%d",
 		  slot_size);
 		return -EINVAL;
-	} else if (slot_size < (ert_user->cq_range/ERT_MAX_SLOTS)) {
-		ERTUSER_ERR(ert_user, "slot_size too small=%d", slot_size);
+	} else if (slot_size < (cmd_queue->cq_range/ERT_MAX_SLOTS)) {
+		ERTUSER_ERR(cmd_queue, "slot_size too small=%d", slot_size);
 		return -EINVAL;
 	}
 
-	ert_user->num_slots = ert_user->cq_range / slot_size;
-	ert_user->slot_size = slot_size;
+	cmd_queue->num_slots = cmd_queue->cq_range / slot_size;
+	cmd_queue->slot_size = slot_size;
 
-	ert_user_reset(ert_user);
+	cmd_queue_reset(cmd_queue);
 
 	return 0;
 }
@@ -834,8 +603,8 @@ command_queue_config(uint32_t slot_size, void *core)
 static uint64_t
 command_queue_size(void *core)
 {
-	struct command_queue *ert_user = (struct command_queue *)core;
-	return ert_user->cq_range;
+	struct command_queue *cmd_queue = (struct command_queue *)core;
+	return cmd_queue->cq_range;
 }
 
 static struct xrt_ert_queue_funcs command_queue_func = {

@@ -143,6 +143,174 @@ struct xrt_ert {
 	struct xrt_ert_queue_funcs    *func;
 };
 
+static ssize_t clock_timestamp_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+
+	return sprintf(buf, "%u\n", ert_user->ert_valid.timestamp);
+}
+
+static DEVICE_ATTR_RO(clock_timestamp);
+
+static ssize_t snap_shot_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+
+	return sprintf(buf, "pq:%d pq_ctrl:%d,  rq:%d, rq_ctrl:%d, sq:%d cq:%d\n", ert_user->pq.num, ert_user->pq_ctrl.num, ert_user->rq.num
+		,ert_user->rq_ctrl.num, ert_user->sq.num, ert_user->cq.num);
+}
+
+static DEVICE_ATTR_RO(snap_shot);
+
+static ssize_t ert_dmsg_store(struct device *dev,
+	struct device_attribute *da, const char *buf, size_t count)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	u32 val;
+
+	mutex_lock(&ert_user->lock);
+	if (kstrtou32(buf, 10, &val) == -EINVAL || val > 2) {
+		xocl_err(&to_platform_device(dev)->dev,
+			"usage: echo 0 or 1 > ert_dmsg");
+		return -EINVAL;
+	}
+
+	ert_user->ert_dmsg = val;
+
+	mutex_unlock(&ert_user->lock);
+	return count;
+}
+static DEVICE_ATTR_WO(ert_dmsg);
+
+static ssize_t ert_echo_store(struct device *dev,
+	struct device_attribute *da, const char *buf, size_t count)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	u32 val;
+
+	mutex_lock(&ert_user->lock);
+	if (kstrtou32(buf, 10, &val) == -EINVAL || val > 2) {
+		xocl_err(&to_platform_device(dev)->dev,
+			"usage: echo 0 or 1 > ert_echo");
+		return -EINVAL;
+	}
+
+	ert_user->echo = val;
+
+	mutex_unlock(&ert_user->lock);
+	return count;
+}
+static DEVICE_ATTR_WO(ert_echo);
+
+static ssize_t ert_intr_store(struct device *dev,
+	struct device_attribute *da, const char *buf, size_t count)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+	u32 val;
+
+	mutex_lock(&ert_user->lock);
+	if (kstrtou32(buf, 10, &val) == -EINVAL || val > 2) {
+		xocl_err(&to_platform_device(dev)->dev,
+			"usage: echo 0 or 1 > ert_intr");
+		return -EINVAL;
+	}
+
+	ert_user->intr = val;
+
+	mutex_unlock(&ert_user->lock);
+	return count;
+}
+static DEVICE_ATTR_WO(ert_intr);
+
+static ssize_t mb_sleep_store(struct device *dev,
+	struct device_attribute *da, const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	u32 go_sleep;
+
+	if (kstrtou32(buf, 10, &go_sleep) == -EINVAL || go_sleep > 2) {
+		xocl_err(&to_platform_device(dev)->dev,
+			"usage: echo 0 or 1 > mb_sleep");
+		return -EINVAL;
+	}
+
+	if (go_sleep)
+		ert_user_gpio_cfg(pdev, MB_SLEEP);
+	else
+		ert_user_gpio_cfg(pdev, MB_WAKEUP);
+
+	return count;
+}
+
+static ssize_t mb_sleep_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+
+	return sprintf(buf, "%d", ert_user_gpio_cfg(pdev, MB_STATUS));
+}
+
+static DEVICE_ATTR_RW(mb_sleep);
+
+static ssize_t cq_read_cnt_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+
+	return sprintf(buf, "%d\n", ert_user->ert_valid.cq_read_single);
+}
+
+static DEVICE_ATTR_RO(cq_read_cnt);
+
+static ssize_t cq_write_cnt_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+
+	return sprintf(buf, "%d\n", ert_user->ert_valid.cq_write_single);
+}
+
+static DEVICE_ATTR_RO(cq_write_cnt);
+
+static ssize_t cu_read_cnt_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+
+	return sprintf(buf, "%d\n", ert_user->ert_valid.cu_read_single);
+}
+
+static DEVICE_ATTR_RO(cu_read_cnt);
+
+static ssize_t cu_write_cnt_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
+{
+	struct xocl_ert_user *ert_user = platform_get_drvdata(to_platform_device(dev));
+
+	return sprintf(buf, "%d\n", ert_user->ert_valid.cu_write_single);
+}
+
+static DEVICE_ATTR_RO(cu_write_cnt);
+
+static struct attribute *ert_user_attrs[] = {
+	&dev_attr_clock_timestamp.attr,
+	&dev_attr_ert_dmsg.attr,
+	&dev_attr_snap_shot.attr,
+	&dev_attr_ert_echo.attr,
+	&dev_attr_ert_intr.attr,
+	&dev_attr_mb_sleep.attr,
+	&dev_attr_cq_read_cnt.attr,
+	&dev_attr_cq_write_cnt.attr,
+	&dev_attr_cu_read_cnt.attr,
+	&dev_attr_cu_write_cnt.attr,
+	NULL,
+};
+
+static struct attribute_group ert_user_attr_group = {
+	.attrs = ert_user_attrs,
+};
 static int ert_user_bulletin(struct platform_device *pdev, struct ert_cu_bulletin *brd)
 {
 	struct xrt_ert *ert_user = platform_get_drvdata(pdev);
