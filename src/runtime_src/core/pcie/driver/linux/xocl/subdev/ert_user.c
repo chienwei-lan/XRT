@@ -343,11 +343,11 @@ static int ert_user_enable(struct platform_device *pdev, bool enable)
 	return ret;
 }
 
-static struct xrt_ert_funcs ert_user_ops = {
+static struct xocl_ert_user_funcs ert_user_ops = {
 	.bulletin = ert_user_bulletin,
 	.enable = ert_user_enable,
 };
-static void ert_submit(struct kds_ert *ert, struct kds_command *xcmd);
+static void ert_user_submit(struct kds_ert *ert, struct kds_command *xcmd);
 
 static void ert_free_cmd(struct xrt_ert_command* ecmd)
 {
@@ -843,7 +843,7 @@ static inline void process_ert_pq(struct xrt_ert *ert, struct xrt_ert_queue *pq,
 	spin_unlock_irqrestore(&ert->pq_lock, flags);
 }
 
-static void ert_submit(struct kds_ert *kds_ert, struct kds_command *xcmd)
+static void ert_user_submit(struct kds_ert *kds_ert, struct kds_command *xcmd)
 {
 	unsigned long flags;
 	bool first_command = false;
@@ -1056,7 +1056,7 @@ static int ert_user_remove(struct platform_device *pdev)
 
 	xocl_drvinst_release(ert_user, &hdl);
 
-	ert_intc_enable(ert_user, false);
+	//ert_intc_enable(ert_user, false);
 
 	ert_user->stop = 1;
 	up(&ert_user->sem);
@@ -1133,14 +1133,14 @@ static int ert_user_probe(struct platform_device *pdev)
 		goto done;
 	}
 	ert_user->ert.submit = ert_user_submit;
-	ert_user->ert.abort = xrt_ert_abort;
-	ert_user->ert.abort_done = xrt_ert_abort_done;
+	ert_user->ert.abort = xocl_ert_abort;
+	ert_user->ert.abort_done = xocl_ert_abort_done;
 	xocl_kds_init_ert(xdev, &ert_user->ert);
 
 	/* Enable interrupt by default */
 	ert_user->num_slots = 128;
 	ert_user->polling_mode = false;
-	ert_intc_enable(ert_user, true);
+	//ert_intc_enable(ert_user, true);
 done:
 	if (err) {
 		ert_user_remove(pdev);
