@@ -1118,7 +1118,7 @@ static int ert_user_probe(struct platform_device *pdev)
 	xocl_kds_init_ert(xdev, &ert_user->ert.ert);
 
 	/* Enable interrupt by default */
-	ert_user->num_slots = ERT_MAX_SLOTS;
+	ert_user->num_slots = 128;
 	ert_user->polling_mode = false;
 	ert_intc_enable(ert_user, true);
 
