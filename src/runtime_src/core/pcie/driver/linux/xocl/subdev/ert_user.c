@@ -925,7 +925,7 @@ static inline bool ert_thread_sleep_condition(struct xrt_ert *ert)
 	return ret;
 }
 
-int xrt_ert_thread(void *data)
+int ert_user_thread(void *data)
 {
 	struct xrt_ert *ert = (struct xrt_ert *)data;
  	int ret = 0;
@@ -1072,7 +1072,6 @@ static int ert_user_remove(struct platform_device *pdev)
 static int ert_user_probe(struct platform_device *pdev)
 {
 	struct xrt_ert *ert_user;
-	struct resource *res;
 	int err = 0;
 	xdev_handle_t xdev = xocl_get_xdev(pdev);
 	struct xocl_ert_sched_privdata *priv = NULL;
