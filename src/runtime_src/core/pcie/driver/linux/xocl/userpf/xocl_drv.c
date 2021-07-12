@@ -1798,11 +1798,11 @@ static int (*xocl_drv_reg_funcs[])(void) __initdata = {
 	xocl_init_spc,
 	xocl_init_lapc,
 	xocl_init_msix_xdma,
-	xocl_init_ert_user,
 	xocl_init_m2m,
 	xocl_init_add,
-	xocl_init_command_queue,
 	xocl_init_config_gpio,
+	xocl_init_ert_user,
+	xocl_init_command_queue,
 };
 
 static void (*xocl_drv_unreg_funcs[])(void) = {
@@ -1838,13 +1838,13 @@ static void (*xocl_drv_unreg_funcs[])(void) = {
 	xocl_fini_spc,
 	xocl_fini_lapc,
 	xocl_fini_msix_xdma,
-	xocl_fini_ert_user,
 	xocl_fini_m2m,
 	/* Remove intc sub-device after CU/ERT sub-devices */
 	xocl_fini_intc,
 	xocl_fini_add,
+	xocl_fini_config_gpio,
+	xocl_fini_ert_user,
 	xocl_fini_command_queue,
-	xocl_fini_config_gpio
 };
 
 static int __init xocl_init(void)
