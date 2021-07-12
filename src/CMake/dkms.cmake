@@ -246,6 +246,7 @@ SET (XRT_DKMS_DRIVER_SRCS
   xocl/subdev/ert_user.c
   xocl/subdev/command_queue.c
   xocl/subdev/pcie_firewall.c
+  xocl/subdev/cfg_gpio.c
   xocl/Makefile
   )
 

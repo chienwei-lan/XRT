@@ -266,6 +266,7 @@ enum {
 #define	XOCL_PCIE_FIREWALL	"pcie_firewall"
 #define	XOCL_ADD		"deadlock_detector"
 #define XOCL_COMMAND_QUEUE 	"command_queue"
+#define XOCL_CFG_GPIO 		"ert_cfg_gpio"
 
 #define XOCL_DEVNAME(str)	str SUBDEV_SUFFIX
 
@@ -320,6 +321,7 @@ enum subdev_id {
 	XOCL_SUBDEV_ERT_VERSAL,
 	XOCL_SUBDEV_ADD,
 	XOCL_SUBDEV_COMMAND_QUEUE,
+	XOCL_SUBDEV_CFG_GPIO,
 	XOCL_SUBDEV_NUM
 };
 

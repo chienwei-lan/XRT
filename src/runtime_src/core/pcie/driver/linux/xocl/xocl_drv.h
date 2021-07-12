@@ -2513,4 +2513,6 @@ void xocl_fini_add(void);
 int __init xocl_init_command_queue(void);
 void xocl_fini_command_queue(void);
 
+int __init xocl_init_config_gpio(void);
+void xocl_fini_config_gpio(void);
 #endif

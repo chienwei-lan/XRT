@@ -92,6 +92,7 @@ xocl-y := \
 	../subdev/ert_user.o \
 	../subdev/add.o \
 	../subdev/command_queue.o \
+	../subdev/cfg_gpio.o \
 	$(xocl_lib-y)	\
 	$(drv_common-y) \
 	xocl_drv.o	\
