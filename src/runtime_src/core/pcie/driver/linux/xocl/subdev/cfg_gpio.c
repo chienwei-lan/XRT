@@ -16,7 +16,6 @@
  */
 
 #include "../xocl_drv.h"
-#include "xrt_ert.h"
 
 #define GPIO_CFG_CTRL_CHANNEL	0x0
 #define GPIO_CFG_STA_CHANNEL	0x8

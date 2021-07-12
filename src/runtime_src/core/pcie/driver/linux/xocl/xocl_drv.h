@@ -61,6 +61,7 @@
 #include "lib/libfdt/libfdt.h"
 #include <linux/firmware.h>
 #include "kds_core.h"
+#include "xrt_ert.h"
 #include "xclerr_int.h"
 #if defined(RHEL_RELEASE_CODE)
 #if RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(8, 3)
@@ -1923,6 +1924,12 @@ struct xocl_ert_user_funcs {
 
 #define xocl_ert_on(xdev) \
 	(xocl_mb_sched_on(xdev) || xocl_ps_sched_on(xdev))
+
+
+struct xocl_config_gpio_funcs {
+	struct xocl_subdev_funcs common_funcs;
+	int (* gpio_cfg)(struct platform_device *pdev, enum ert_gpio_cfg type);
+};
 
 
 /* helper functions */
