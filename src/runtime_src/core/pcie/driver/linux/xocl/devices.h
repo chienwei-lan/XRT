@@ -265,6 +265,7 @@ enum {
 #define	XOCL_M2M		"m2m"
 #define	XOCL_PCIE_FIREWALL	"pcie_firewall"
 #define	XOCL_ADD		"deadlock_detector"
+#define XOCL_COMMAND_QUEUE 	"command_queue"
 
 #define XOCL_DEVNAME(str)	str SUBDEV_SUFFIX
 
@@ -318,6 +319,7 @@ enum subdev_id {
 	XOCL_SUBDEV_ERT_USER,
 	XOCL_SUBDEV_ERT_VERSAL,
 	XOCL_SUBDEV_ADD,
+	XOCL_SUBDEV_COMMAND_QUEUE,
 	XOCL_SUBDEV_NUM
 };
 
@@ -1757,6 +1759,17 @@ struct xocl_subdev_map {
 		XOCL_ERT_USER,				\
 		XOCL_RES_ERT_USER,			\
 		ARRAY_SIZE(XOCL_RES_ERT_USER),		\
+		&XOCL_RES_SCHEDULER_PRIV,		\
+		sizeof(struct xocl_ert_sched_privdata),	\
+		.override_idx = -1,			\
+	}
+
+#define	XOCL_DEVINFO_ERT_USER_COMMON			\
+	{						\
+		XOCL_SUBDEV_ERT_USER,			\
+		XOCL_ERT_USER,				\
+		NULL,					\
+		0,					\
 		&XOCL_RES_SCHEDULER_PRIV,		\
 		sizeof(struct xocl_ert_sched_privdata),	\
 		.override_idx = -1,			\

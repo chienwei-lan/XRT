@@ -625,3 +625,105 @@ static struct xrt_ert_queue_funcs command_queue_func = {
 	
 	.queue_size = command_queue_size,
 };
+
+static int command_queue_remove(struct platform_device *pdev)
+{
+	struct xrt_ert *command_queue;
+	void *hdl;
+
+	command_queue = platform_get_drvdata(pdev);
+	if (!command_queue) {
+		xocl_err(&pdev->dev, "driver data is NULL");
+		return -EINVAL;
+	}
+
+	//sysfs_remove_group(&pdev->dev.kobj, &command_queue_attr_group);
+
+	xocl_drvinst_release(command_queue, &hdl);
+
+	platform_set_drvdata(pdev, NULL);
+
+	xocl_drvinst_free(hdl);
+
+	return 0;
+}
+
+static int command_queue_probe(struct platform_device *pdev)
+{
+	struct command_queue *command_queue;
+	struct resource *res;
+	int err = 0;
+	xdev_handle_t xdev = xocl_get_xdev(pdev);
+	struct xocl_ert_sched_privdata *priv = NULL;
+
+	command_queue = xocl_drvinst_alloc(&pdev->dev, sizeof(struct command_queue));
+	if (!command_queue)
+		return -ENOMEM;
+
+	command_queue->dev = &pdev->dev;
+	command_queue->pdev = pdev;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		xocl_err(&pdev->dev, "did not get memory");
+		err = -ENOMEM;
+		goto done;
+	}
+
+	xocl_info(&pdev->dev, "CQ IO start: 0x%llx, end: 0x%llx",
+		res->start, res->end);
+
+	command_queue->cq_range = res->end - res->start + 1;
+	command_queue->cq_base = ioremap_wc(res->start, command_queue->cq_range);
+	if (!command_queue->cq_base) {
+		err = -EIO;
+		xocl_err(&pdev->dev, "Map iomem failed");
+		goto done;
+	}
+	platform_set_drvdata(pdev, command_queue);
+
+done:
+	if (err) {
+		command_queue_remove(pdev);
+		return err;
+	} else {
+		struct xocl_subdev_info subdev_info = XOCL_DEVINFO_ERT_USER_COMMON;
+
+		err = xocl_subdev_create(xdev, &subdev_info);
+		if (err) {
+			xocl_err(&pdev->dev, "can't create ERT_USER_COMMON subdev");
+			return err;
+		}
+
+	}
+	return 0;
+}
+
+struct xocl_drv_private command_queue_priv = {
+	.ops = NULL,
+	.dev = -1,
+};
+
+struct platform_device_id command_queue_id_table[] = {
+	{ XOCL_DEVNAME(XOCL_COMMAND_QUEUE), (kernel_ulong_t)&command_queue_priv },
+	{ },
+};
+
+static struct platform_driver	command_queue_driver = {
+	.probe		= command_queue_probe,
+	.remove		= command_queue_remove,
+	.driver		= {
+		.name = XOCL_DEVNAME(XOCL_COMMAND_QUEUE),
+	},
+	.id_table = command_queue_id_table,
+};
+
+int __init xocl_init_command_queue(void)
+{
+	return platform_driver_register(&command_queue_driver);
+}
+
+void xocl_fini_command_queue(void)
+{
+	platform_driver_unregister(&command_queue_driver);
+}

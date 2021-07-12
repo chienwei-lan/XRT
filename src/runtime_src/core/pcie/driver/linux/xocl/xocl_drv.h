@@ -2507,7 +2507,10 @@ void xocl_fini_ert_user(void);
 int __init xocl_init_pcie_firewall(void);
 void xocl_fini_pcie_firewall(void);
 
-
 int __init xocl_init_add(void);
 void xocl_fini_add(void);
+
+int __init xocl_init_command_queue(void);
+void xocl_fini_command_queue(void);
+
 #endif
