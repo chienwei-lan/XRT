@@ -16,6 +16,7 @@
  */
 
 #include "../xocl_drv.h"
+#include "xrt_ert.h"
 
 #define GPIO_CFG_CTRL_CHANNEL	0x0
 #define GPIO_CFG_STA_CHANNEL	0x8
@@ -63,7 +64,7 @@ static int32_t gpio_cfg(struct platform_device *pdev, enum ert_gpio_cfg type)
 	int i;
 
 	if (!cfg_gpio->cfg_gpio) {
-		ERTUSER_WARN(ert_user, "%s ERT config gpio not found\n", __func__);
+		//ERTUSER_WARN(ert_user, "%s ERT config gpio not found\n", __func__);
 		return -ENODEV;
 	}
 	mutex_lock(&cfg_gpio->lock);
