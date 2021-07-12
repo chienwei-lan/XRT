@@ -54,11 +54,4 @@ struct xrt_ert_queue_funcs {
 
 };
 
-enum ert_gpio_cfg {
-	INTR_TO_ERT,
-	INTR_TO_CU,
-	MB_WAKEUP,
-	MB_SLEEP,
-	MB_STATUS,
-};
 #endif /* _XRT_ERT_H */

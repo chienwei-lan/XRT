@@ -1926,6 +1926,14 @@ struct xocl_ert_user_funcs {
 	(xocl_mb_sched_on(xdev) || xocl_ps_sched_on(xdev))
 
 
+enum ert_gpio_cfg {
+	INTR_TO_ERT,
+	INTR_TO_CU,
+	MB_WAKEUP,
+	MB_SLEEP,
+	MB_STATUS,
+};
+
 struct xocl_config_gpio_funcs {
 	struct xocl_subdev_funcs common_funcs;
 	int (* gpio_cfg)(struct platform_device *pdev, enum ert_gpio_cfg type);
